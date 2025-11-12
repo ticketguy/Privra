@@ -52,8 +52,8 @@ fi
 # Generate SECRET_KEY if not set
 if grep -q "CHANGE_ME_TO_RANDOM_STRING" .env; then
     echo "🔐 Generating SECRET_KEY..."
-    SECRET_KEY=$(openssl rand -base64 16)
-    sed -i "s/CHANGE_ME_TO_RANDOM_STRING/${SECRET_KEY}/" .env
+    SECRET_KEY=$(openssl rand -hex 16)
+    sed -i "s|CHANGE_ME_TO_RANDOM_STRING|${SECRET_KEY}|" .env
     echo "✅ SECRET_KEY generated"
 fi
 
