@@ -61,6 +61,7 @@ services:
     volumes:
       - "./mail:/mail"
       - "./overrides/dovecot:/overrides:ro"
+      - "./certs:/certs:ro"
     networks:
       - mailnet
     depends_on:
@@ -74,6 +75,7 @@ services:
     volumes:
       - "./mailqueue:/queue"
       - "./overrides/postfix:/overrides:ro"
+      - "./certs:/certs:ro"
     networks:
       - mailnet
     depends_on:
