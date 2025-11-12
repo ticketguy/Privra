@@ -59,7 +59,7 @@ fi
 
 # Create necessary directories
 echo "📁 Creating directories..."
-mkdir -p data dkim mail webmail filter certs overrides/nginx overrides/postfix overrides/dovecot overrides/rspamd overrides/roundcube mailqueue
+mkdir -p data dkim mail webmail filter certs overrides/nginx overrides/postfix overrides/dovecot overrides/rspamd overrides/webmail mailqueue
 chmod -R 755 data dkim mail webmail filter certs overrides mailqueue
 echo "✅ Directories created"
 
