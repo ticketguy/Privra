@@ -14,11 +14,14 @@ echo ""
 echo "🛑 Stopping front container..."
 docker compose stop front
 
-# Create nginx override directory
+# Create nginx override directory with proper permissions
+echo "📁 Creating override directory..."
 mkdir -p overrides/nginx
+chmod -R 755 overrides
 
 # Create a script that will fix the nginx.conf after it's generated
-cat > overrides/nginx/start <<'EOF'
+echo "📝 Creating custom start script..."
+cat << 'EOF' > overrides/nginx/start
 #!/bin/bash
 # Run the original start script to generate nginx.conf
 python3 /start.py
