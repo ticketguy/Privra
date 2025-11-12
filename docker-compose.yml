@@ -50,8 +50,11 @@ services:
       - "./dkim:/dkim"
     networks:
       - mailnet
+    dns:
+      - 192.168.203.254
     depends_on:
       - redis
+      - resolver
 
   # IMAP - Dovecot mail server
   imap:
