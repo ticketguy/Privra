@@ -1,11 +1,9 @@
 # Quick Fix Guide for Privra Mail Server
 
-## Current Issue
-The nginx front container is failing due to a bug in Mailu 2024.06's Jinja2 template that generates broken nginx config.
+## Solution
+Replaced broken Mailu nginx with clean custom nginx:alpine configuration.
 
-## 🎯 ONE-COMMAND CLEANUP & FIX
-
-First, clean up your repository:
+## 🎯 ONE-COMMAND FIX
 
 ```bash
 cd ~/privra-mail
@@ -15,59 +13,27 @@ git pull
 
 This script will:
 - ✅ Stop all containers
-- ✅ Reset repository to clean state (discards local changes)
-- ✅ Pull latest code
-- ✅ Verify docker-compose.yml has entrypoint override
-- ✅ Create nginx override to fix the config
-- ✅ Start all containers
+- ✅ Reset repository to clean state
+- ✅ Pull latest code (custom nginx config)
+- ✅ Validate configuration
+- ✅ Start all containers with custom nginx
 - ✅ Show status
 
 **Wait 20 seconds** for it to complete.
 
----
+## What Changed
 
-## 🔄 Alternative: Replace with Custom Nginx (RECOMMENDED IF ABOVE FAILS)
+We replaced the buggy Mailu nginx image with a clean `nginx:alpine` image and custom configuration:
+- **Before**: `ghcr.io/mailu/nginx:2024.06` with broken Jinja2 template
+- **After**: `nginx:alpine` with custom config (no template bugs!)
 
-If the override approach still doesn't work, replace the broken Mailu nginx entirely:
-
-```bash
-cd ~/privra-mail
-git pull
-# Edit docker-compose.yml and replace the front service with:
-```
-
-```yaml
-  front:
-    image: nginx:alpine
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-      - "25:25"
-      - "465:465"
-      - "587:587"
-      - "110:110"
-      - "995:995"
-      - "143:143"
-      - "993:993"
-    volumes:
-      - "./certs:/certs:ro"
-      - "./custom-nginx.conf:/etc/nginx/nginx.conf:ro"
-    networks:
-      - mailnet
-    depends_on:
-      - admin
-      - imap
-      - smtp
-```
-
-Then:
-```bash
-docker compose down
-docker compose up -d
-```
-
-This uses a clean, custom nginx configuration that bypasses the Mailu template bug entirely.
+The custom config handles:
+- ✅ HTTPS with automatic HTTP→HTTPS redirect
+- ✅ Admin interface at /admin
+- ✅ SMTP (ports 25, 587, 465)
+- ✅ IMAP (ports 143, 993)
+- ✅ POP3 (ports 110, 995)
+- ✅ TCP stream proxying to backend mail servers
 
 ---
 

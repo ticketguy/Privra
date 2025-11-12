@@ -1,7 +1,7 @@
 #!/bin/bash
 
-echo "🧹 Cleaning up repository and fixing nginx..."
-echo "=============================================="
+echo "🧹 Cleaning up and deploying custom nginx..."
+echo "============================================="
 echo ""
 
 # Step 1: Stop all containers
@@ -19,45 +19,7 @@ echo ""
 echo "📥 Pulling latest changes..."
 git pull
 
-# Step 4: Verify docker-compose.yml has entrypoint
-echo ""
-echo "✅ Verifying docker-compose.yml..."
-if grep -q 'entrypoint: \["/overrides/start"\]' docker-compose.yml; then
-    echo "✅ Entrypoint override found in docker-compose.yml"
-else
-    echo "❌ Entrypoint not found. Adding it now..."
-    # Add it after the env_file line
-    sed -i '/services:/,/front:/ {
-        /front:/,/depends_on:/ {
-            /env_file: \.env/ a\    entrypoint: ["/overrides/start"]
-        }
-    }' docker-compose.yml
-fi
-
-# Step 5: Create override directory and script
-echo ""
-echo "📝 Creating nginx override..."
-sudo mkdir -p overrides/nginx
-
-sudo tee overrides/nginx/start > /dev/null <<'OVERRIDE_SCRIPT'
-#!/bin/bash
-# Custom start script that fixes the nginx config bug
-
-# Run the original start script to generate nginx.conf
-python3 /start.py
-
-# Fix the malformed location directive by deleting the broken lines
-sed -i '182,188d' /etc/nginx/nginx.conf
-
-# Start nginx
-exec nginx -g "daemon off;"
-OVERRIDE_SCRIPT
-
-sudo chmod +x overrides/nginx/start
-
-echo "✅ Override created"
-
-# Step 6: Validate docker-compose.yml
+# Step 4: Validate docker-compose.yml
 echo ""
 echo "🔍 Validating docker-compose.yml..."
 if docker compose config > /dev/null 2>&1; then
@@ -68,12 +30,22 @@ else
     exit 1
 fi
 
-# Step 7: Start containers
+# Step 5: Check custom nginx config exists
 echo ""
-echo "🚀 Starting containers..."
+echo "📝 Verifying custom nginx configuration..."
+if [ -f "custom-nginx.conf" ]; then
+    echo "✅ custom-nginx.conf found"
+else
+    echo "❌ custom-nginx.conf not found!"
+    exit 1
+fi
+
+# Step 6: Start containers
+echo ""
+echo "🚀 Starting containers with custom nginx..."
 docker compose up -d
 
-# Step 8: Wait and check
+# Step 7: Wait and check
 echo ""
 echo "⏳ Waiting 20 seconds for startup..."
 sleep 20
@@ -87,14 +59,16 @@ echo "🔍 Front container logs:"
 docker compose logs --tail=15 front
 
 echo ""
-if docker compose ps front | grep -q "Up"; then
+if docker compose ps front | grep -q "Up" && ! docker compose logs front 2>&1 | grep -q "emerg"; then
     echo "✅ SUCCESS! Front container is running!"
     echo ""
     echo "🌐 Access your mail server:"
     echo "   https://mail.privra.xyz/admin"
-else
-    echo "❌ Front container still failing"
     echo ""
-    echo "Let's check if the override is being used..."
-    docker compose run --rm --entrypoint /bin/sh front -c "ls -lh /overrides/ && cat /overrides/start 2>/dev/null || echo 'Override not found in container'"
+    echo "📝 Note: Using custom nginx:alpine (bypassed broken Mailu template)"
+else
+    echo "❌ Front container has issues. Check logs above."
+    echo ""
+    echo "Testing nginx config..."
+    docker compose exec front nginx -t 2>&1 || echo "Nginx test failed"
 fi
