@@ -13,6 +13,7 @@ services:
     image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}nginx:${MAILU_VERSION:-2.0}
     restart: always
     env_file: .env
+    entrypoint: ["/overrides/start"]
     ports:
       - "80:80"      # HTTP
       - "443:443"    # HTTPS

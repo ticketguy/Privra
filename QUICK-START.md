@@ -3,35 +3,31 @@
 ## Current Issue
 The nginx front container is failing with: `invalid number of arguments in "location" directive`
 
-## Three Fix Options (Try in Order)
+## 🎯 ONE-COMMAND FIX (RECOMMENDED)
 
-### Option 1: Nginx Override Fix (RECOMMENDED)
-This creates a custom start script that removes the broken nginx configuration lines.
+This comprehensive fix handles everything automatically:
 
 ```bash
-cd ~/Privra  # or wherever your mail server is
+cd ~/privra-mail  # or ~/Privra depending on your folder name
 git pull
-./nginx-override-fix.sh
+./final-comprehensive-fix.sh
 ```
 
-**Wait 15 seconds**, then check status with:
-```bash
-docker compose ps front
-```
+This script will:
+- ✅ Validate and fix docker-compose.yml if needed
+- ✅ Create the nginx override script
+- ✅ Add entrypoint override to docker-compose.yml
+- ✅ Restart all containers
+- ✅ Show you the status
+
+**Wait 20 seconds** for it to complete.
 
 ---
 
-### Option 2: Alternative .env Fix
-If Option 1 doesn't work, this completely removes WEBMAIL/WEBDAV variables and disables the webmail service.
+## Alternative Options (If Needed)
 
-```bash
-./alternative-fix.sh
-```
-
----
-
-### Option 3: Manual Fix
-If both automated scripts fail:
+### Option 2: Manual Fix
+If the comprehensive script doesn't work:
 
 1. Stop all containers:
    ```bash
