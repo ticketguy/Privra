@@ -37,17 +37,29 @@ else
     echo "✅ Docker Compose is available"
 fi
 
+# Create .env from .env.example if it doesn't exist
+if [ ! -f .env ]; then
+    if [ -f .env.example ]; then
+        echo "📋 Creating .env from .env.example..."
+        cp .env.example .env
+        echo "✅ .env file created"
+    else
+        echo "❌ .env.example not found. Please ensure you're in the correct directory."
+        exit 1
+    fi
+fi
+
 # Generate SECRET_KEY if not set
 if grep -q "CHANGE_ME_TO_RANDOM_STRING" .env; then
     echo "🔐 Generating SECRET_KEY..."
-    SECRET_KEY=$(openssl rand -base64 16)
-    sed -i "s/CHANGE_ME_TO_RANDOM_STRING/${SECRET_KEY}/" .env
+    SECRET_KEY=$(openssl rand -hex 16)
+    sed -i "s|CHANGE_ME_TO_RANDOM_STRING|${SECRET_KEY}|" .env
     echo "✅ SECRET_KEY generated"
 fi
 
 # Create necessary directories
 echo "📁 Creating directories..."
-mkdir -p data dkim mail webmail filter certs overrides/nginx overrides/postfix overrides/dovecot overrides/rspamd overrides/roundcube mailqueue
+mkdir -p data dkim mail webmail filter certs overrides/nginx overrides/postfix overrides/dovecot overrides/rspamd overrides/webmail mailqueue
 chmod -R 755 data dkim mail webmail filter certs overrides mailqueue
 echo "✅ Directories created"
 
