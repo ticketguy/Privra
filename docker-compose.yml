@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+  # Redis - Caching and session management
+  redis:
+    image: redis:alpine
+    restart: always
+    volumes:
+      - "./data/redis:/data"
+    networks:
+      - mailnet
+
+  # Front - Nginx reverse proxy
+  front:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}nginx:${MAILU_VERSION:-2.0}
+    restart: always
+    env_file: .env
+    ports:
+      - "80:80"      # HTTP
+      - "443:443"    # HTTPS
+      - "25:25"      # SMTP
+      - "465:465"    # SMTPS
+      - "587:587"    # Submission
+      - "110:110"    # POP3
+      - "995:995"    # POP3S
+      - "143:143"    # IMAP
+      - "993:993"    # IMAPS
+    volumes:
+      - "./certs:/certs"
+      - "./overrides/nginx:/overrides:ro"
+    networks:
+      - mailnet
+    depends_on:
+      - resolver
+
+  # Resolver - DNS resolution
+  resolver:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}unbound:${MAILU_VERSION:-2.0}
+    env_file: .env
+    restart: always
+    networks:
+      mailnet:
+        ipv4_address: 192.168.203.254
+
+  # Admin - Web administration interface
+  admin:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}admin:${MAILU_VERSION:-2.0}
+    restart: always
+    env_file: .env
+    volumes:
+      - "./data:/data"
+      - "./dkim:/dkim"
+    networks:
+      - mailnet
+    depends_on:
+      - redis
+
+  # IMAP - Dovecot mail server
+  imap:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}dovecot:${MAILU_VERSION:-2.0}
+    restart: always
+    env_file: .env
+    volumes:
+      - "./mail:/mail"
+      - "./overrides/dovecot:/overrides:ro"
+    networks:
+      - mailnet
+    depends_on:
+      - front
+
+  # SMTP - Postfix mail transfer agent
+  smtp:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}postfix:${MAILU_VERSION:-2.0}
+    restart: always
+    env_file: .env
+    volumes:
+      - "./mailqueue:/queue"
+      - "./overrides/postfix:/overrides:ro"
+    networks:
+      - mailnet
+    depends_on:
+      - front
+      - resolver
+
+  # Antispam - Rspamd spam filter
+  antispam:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}rspamd:${MAILU_VERSION:-2.0}
+    restart: always
+    env_file: .env
+    volumes:
+      - "./filter:/var/lib/rspamd"
+      - "./overrides/rspamd:/overrides:ro"
+    networks:
+      - mailnet
+    depends_on:
+      - front
+      - redis
+      - resolver
+
+  # Webmail - Roundcube (optional but recommended for seeing it work)
+  webmail:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}roundcube:${MAILU_VERSION:-2.0}
+    restart: always
+    env_file: .env
+    volumes:
+      - "./webmail:/data"
+      - "./overrides/roundcube:/overrides:ro"
+    networks:
+      - mailnet
+    depends_on:
+      - imap
+
+  # Fetchmail - Optional: fetch emails from external accounts
+  # fetchmail:
+  #   image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}fetchmail:${MAILU_VERSION:-2.0}
+  #   restart: always
+  #   env_file: .env
+  #   networks:
+  #     - mailnet
+  #   depends_on:
+  #     - admin
+  #     - smtp
+  #     - imap
+
+networks:
+  mailnet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.203.0/24
