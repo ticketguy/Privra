@@ -37,6 +37,18 @@ else
     echo "✅ Docker Compose is available"
 fi
 
+# Create .env from .env.example if it doesn't exist
+if [ ! -f .env ]; then
+    if [ -f .env.example ]; then
+        echo "📋 Creating .env from .env.example..."
+        cp .env.example .env
+        echo "✅ .env file created"
+    else
+        echo "❌ .env.example not found. Please ensure you're in the correct directory."
+        exit 1
+    fi
+fi
+
 # Generate SECRET_KEY if not set
 if grep -q "CHANGE_ME_TO_RANDOM_STRING" .env; then
     echo "🔐 Generating SECRET_KEY..."
