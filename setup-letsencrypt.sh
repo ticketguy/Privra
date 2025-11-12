@@ -33,18 +33,23 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "✅ Let's Encrypt certificate obtained successfully!"
 
-    # Copy certificates to certs directory
+    # Create Mailu's expected certificate structure
     echo ""
-    echo "📋 Copying certificates to certs directory..."
-    sudo cp /etc/letsencrypt/live/mail.privra.xyz/fullchain.pem certs/cert.pem
-    sudo cp /etc/letsencrypt/live/mail.privra.xyz/privkey.pem certs/key.pem
+    echo "📋 Creating Mailu certificate structure..."
+    mkdir -p certs/letsencrypt/live/mail.privra.xyz
+
+    # Copy certificates to Mailu's expected location
+    sudo cp /etc/letsencrypt/live/mail.privra.xyz/fullchain.pem certs/letsencrypt/live/mail.privra.xyz/
+    sudo cp /etc/letsencrypt/live/mail.privra.xyz/privkey.pem certs/letsencrypt/live/mail.privra.xyz/
+    sudo cp /etc/letsencrypt/live/mail.privra.xyz/chain.pem certs/letsencrypt/live/mail.privra.xyz/ 2>/dev/null || true
+    sudo cp /etc/letsencrypt/live/mail.privra.xyz/cert.pem certs/letsencrypt/live/mail.privra.xyz/ 2>/dev/null || true
 
     # Fix permissions
-    sudo chown $USER:$USER certs/cert.pem certs/key.pem
-    chmod 644 certs/cert.pem
-    chmod 600 certs/key.pem
+    sudo chown -R $USER:$USER certs/letsencrypt
+    chmod 644 certs/letsencrypt/live/mail.privra.xyz/*.pem
+    chmod 600 certs/letsencrypt/live/mail.privra.xyz/privkey.pem
 
-    echo "✅ Certificates copied and permissions set"
+    echo "✅ Certificates installed in Mailu structure"
 
     # Start front container
     echo ""
@@ -55,14 +60,11 @@ if [ $? -eq 0 ]; then
     echo "✅ SUCCESS! Let's Encrypt certificates installed!"
     echo ""
     echo "📁 Certificate files:"
-    ls -lh certs/cert.pem certs/key.pem
+    ls -lh certs/letsencrypt/live/mail.privra.xyz/
     echo ""
     echo "🔄 Certificates will auto-renew every 90 days"
-    echo "   Renewal command: sudo certbot renew"
     echo ""
     echo "🌐 Your mail server now has a trusted certificate!"
-    echo "   iPhone and all devices will trust it automatically"
-    echo ""
     echo "📧 Test your mail server at: https://mail.privra.xyz/admin"
 else
     echo ""
@@ -87,10 +89,10 @@ echo ""
 sudo tee /etc/letsencrypt/renewal-hooks/deploy/copy-to-mailu.sh > /dev/null <<'RENEWAL_HOOK'
 #!/bin/bash
 # Copy renewed certificates to Mailu
-cp /etc/letsencrypt/live/mail.privra.xyz/fullchain.pem /home/privra/privra-mail/certs/cert.pem
-cp /etc/letsencrypt/live/mail.privra.xyz/privkey.pem /home/privra/privra-mail/certs/key.pem
-chown privra:privra /home/privra/privra-mail/certs/*.pem
-cd /home/privra/privra-mail && docker compose restart front
+cp /etc/letsencrypt/live/mail.privra.xyz/fullchain.pem /home/privra/privra-mail/certs/letsencrypt/live/mail.privra.xyz/
+cp /etc/letsencrypt/live/mail.privra.xyz/privkey.pem /home/privra/privra-mail/certs/letsencrypt/live/mail.privra.xyz/
+chown -R privra:privra /home/privra/privra-mail/certs/letsencrypt
+cd /home/privra/privra-mail && docker compose restart front imap smtp
 RENEWAL_HOOK
 
 sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/copy-to-mailu.sh
