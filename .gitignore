@@ -1,0 +1,60 @@
+# Privra Mail Server - Git Ignore
+
+# Docker data directories (NEVER commit these!)
+data/
+mail/
+dkim/
+certs/
+filter/
+webmail/
+mailqueue/
+overrides/nginx/
+overrides/postfix/
+overrides/dovecot/
+overrides/rspamd/
+overrides/roundcube/
+
+# Environment file with secrets
+# (commit .env.example instead)
+.env
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Backups
+*.tar.gz
+*.zip
+backup/
+backups/
+
+# Docker
+docker-compose.override.yml
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+env/
+
+# Node
+node_modules/
+npm-debug.log
+
+# OS
+Thumbs.db
