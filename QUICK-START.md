@@ -16,10 +16,17 @@ This script will:
 - ✅ Reset repository to clean state
 - ✅ Pull latest code (custom nginx config)
 - ✅ Validate configuration
+- ✅ Generate self-signed TLS certificates (if needed)
 - ✅ Start all containers with custom nginx
 - ✅ Show status
 
 **Wait 20 seconds** for it to complete.
+
+### 🔐 About TLS Certificates
+
+The script automatically generates **self-signed certificates** for HTTPS. Your browser will show a security warning - this is normal for self-signed certs.
+
+For production use, you should replace these with **Let's Encrypt** certificates later.
 
 ## What Changed
 
