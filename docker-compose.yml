@@ -27,10 +27,6 @@ services:
       - "./custom-nginx.conf:/etc/nginx/nginx.conf:ro"
     networks:
       - mailnet
-    depends_on:
-      - admin
-      - imap
-      - smtp
 
   # Resolver - DNS resolution
   resolver:
