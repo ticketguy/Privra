@@ -1,93 +1,111 @@
 # Quick Fix Guide for Privra Mail Server
 
 ## Current Issue
-The nginx front container is failing with: `invalid number of arguments in "location" directive`
+The nginx front container is failing due to a bug in Mailu 2024.06's Jinja2 template that generates broken nginx config.
 
-## 🎯 ONE-COMMAND FIX (RECOMMENDED)
+## 🎯 ONE-COMMAND CLEANUP & FIX
 
-This comprehensive fix handles everything automatically:
+First, clean up your repository:
 
 ```bash
-cd ~/privra-mail  # or ~/Privra depending on your folder name
+cd ~/privra-mail
 git pull
-./final-comprehensive-fix.sh
+./cleanup-and-fix.sh
 ```
 
 This script will:
-- ✅ Validate and fix docker-compose.yml if needed
-- ✅ Create the nginx override script
-- ✅ Add entrypoint override to docker-compose.yml
-- ✅ Restart all containers
-- ✅ Show you the status
+- ✅ Stop all containers
+- ✅ Reset repository to clean state (discards local changes)
+- ✅ Pull latest code
+- ✅ Verify docker-compose.yml has entrypoint override
+- ✅ Create nginx override to fix the config
+- ✅ Start all containers
+- ✅ Show status
 
 **Wait 20 seconds** for it to complete.
 
 ---
 
-## Alternative Options (If Needed)
+## 🔄 Alternative: Replace with Custom Nginx (RECOMMENDED IF ABOVE FAILS)
 
-### Option 2: Manual Fix
-If the comprehensive script doesn't work:
+If the override approach still doesn't work, replace the broken Mailu nginx entirely:
 
-1. Stop all containers:
-   ```bash
-   docker compose down
-   ```
+```bash
+cd ~/privra-mail
+git pull
+# Edit docker-compose.yml and replace the front service with:
+```
 
-2. Edit `.env` and completely remove these lines:
-   ```
-   WEBMAIL=...
-   WEBDAV=...
-   ```
+```yaml
+  front:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "110:110"
+      - "995:995"
+      - "143:143"
+      - "993:993"
+    volumes:
+      - "./certs:/certs:ro"
+      - "./custom-nginx.conf:/etc/nginx/nginx.conf:ro"
+    networks:
+      - mailnet
+    depends_on:
+      - admin
+      - imap
+      - smtp
+```
 
-3. Start containers:
-   ```bash
-   docker compose up -d
-   ```
+Then:
+```bash
+docker compose down
+docker compose up -d
+```
+
+This uses a clean, custom nginx configuration that bypasses the Mailu template bug entirely.
 
 ---
 
-## Verify Everything Works
+## 🔍 Verify Everything Works
 
-Run the verification script:
 ```bash
-./verify-fix.sh
+docker compose ps
 ```
 
-## Expected Result
+All containers should show "Up" status.
 
-All 8 containers should show "Up" status:
-- ✅ redis
-- ✅ front (nginx)
-- ✅ resolver
-- ✅ admin
-- ✅ imap
-- ✅ smtp
-- ✅ antispam
-- ✅ webmail (if enabled)
-
-## Access Your Mail Server
+## 🌐 Access Your Mail Server
 
 Once front container is running:
 - **Admin Interface**: https://mail.privra.xyz/admin
 - **Domain**: privra.xyz
 
-## Next Steps After Fix
+## 📝 Next Steps
 
-1. Create your first admin user at the admin interface
+1. Create your first admin user at https://mail.privra.xyz/admin
 2. Add domain: privra.xyz
 3. Create mailboxes
 4. Configure DNS records (SPF, DKIM, DMARC)
 
-## Need Help?
+## 🐛 Still Having Issues?
 
 Check logs:
 ```bash
-docker compose logs front
-docker compose logs --tail=50 front
+docker compose logs front --tail=50
 ```
 
-Restart specific container:
+Verify override exists:
 ```bash
-docker compose restart front
+ls -lh overrides/nginx/start
+cat overrides/nginx/start
+```
+
+Test nginx config:
+```bash
+docker compose run --rm --entrypoint /bin/sh front -c "nginx -t"
 ```
