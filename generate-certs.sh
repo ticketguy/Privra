@@ -4,6 +4,12 @@ echo "🔐 Generating self-signed TLS certificates..."
 echo "=============================================="
 echo ""
 
+# Check if certs directory exists and is owned by root
+if [ -d "certs" ] && [ "$(stat -c '%U' certs)" = "root" ]; then
+    echo "⚠️  Certs directory is owned by root, fixing permissions..."
+    sudo chown -R $USER:$USER certs
+fi
+
 # Create certs directory if it doesn't exist
 mkdir -p certs
 
@@ -29,6 +35,10 @@ openssl req -x509 -newkey rsa:4096 -nodes \
     -days 365 \
     -subj "/C=US/ST=State/L=City/O=Privra/CN=mail.privra.xyz" \
     -addext "subjectAltName=DNS:mail.privra.xyz,DNS:privra.xyz"
+
+# Make sure permissions are correct
+chmod 644 certs/cert.pem
+chmod 600 certs/key.pem
 
 if [ $? -eq 0 ]; then
     echo ""
