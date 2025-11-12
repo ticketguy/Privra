@@ -14,14 +14,13 @@ echo ""
 echo "🛑 Stopping front container..."
 docker compose stop front
 
-# Create nginx override directory with proper permissions
+# Create nginx override directory (may need sudo for permissions)
 echo "📁 Creating override directory..."
-mkdir -p overrides/nginx
-chmod -R 755 overrides
+sudo mkdir -p overrides/nginx
 
 # Create a script that will fix the nginx.conf after it's generated
 echo "📝 Creating custom start script..."
-cat << 'EOF' > overrides/nginx/start
+sudo tee overrides/nginx/start > /dev/null <<'EOF'
 #!/bin/bash
 # Run the original start script to generate nginx.conf
 python3 /start.py
@@ -33,7 +32,7 @@ sed -i '182,188d' /etc/nginx/nginx.conf
 exec nginx -g "daemon off;"
 EOF
 
-chmod +x overrides/nginx/start
+sudo chmod +x overrides/nginx/start
 
 echo "✅ Custom override created"
 echo ""
@@ -56,6 +55,9 @@ if docker compose ps front | grep -q "Up"; then
     echo ""
     echo "🌐 Access your mail server:"
     echo "   https://mail.privra.xyz/admin"
+    echo ""
+    echo "📧 Default login:"
+    echo "   Create your first admin user at the admin interface"
 else
     echo "❌ Still failing. Let me check the logs..."
     docker compose logs --tail=20 front
