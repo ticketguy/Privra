@@ -40,6 +40,20 @@ else
     exit 1
 fi
 
+# Step 5.5: Generate certificates if they don't exist
+echo ""
+echo "🔐 Checking TLS certificates..."
+if [ ! -f "certs/cert.pem" ] || [ ! -f "certs/key.pem" ]; then
+    echo "⚠️  TLS certificates not found. Generating self-signed certificates..."
+    ./generate-certs.sh
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to generate certificates"
+        exit 1
+    fi
+else
+    echo "✅ TLS certificates found"
+fi
+
 # Step 6: Start containers
 echo ""
 echo "🚀 Starting containers with custom nginx..."
