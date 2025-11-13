@@ -99,6 +99,22 @@ services:
       redis:
         condition: service_healthy
 
+  # Webmail - Email client interface
+  webmail:
+    build: ./webmail
+    restart: always
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - IMAP_HOST=dovecot
+      - IMAP_PORT=993
+      - SMTP_HOST=postfix
+      - SMTP_PORT=587
+    networks:
+      - mailnet
+    depends_on:
+      - dovecot
+      - postfix
+
   # Nginx - SSL termination & reverse proxy
   nginx:
     image: nginx:alpine

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Privra Webmail{% endblock %}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            line-height: 1.6;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 1.5rem;
+        }
+        .header nav a {
+            color: white;
+            text-decoration: none;
+            margin-left: 1.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+        .header nav a:hover {
+            background: #34495e;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .flash-messages {
+            margin-bottom: 1rem;
+        }
+        .flash {
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+        }
+        .flash.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .flash.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        .form-group textarea {
+            min-height: 200px;
+            resize: vertical;
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: opacity 0.3s;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        .email-list {
+            list-style: none;
+        }
+        .email-item {
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            transition: background 0.2s;
+        }
+        .email-item:hover {
+            background: #f8f9fa;
+        }
+        .email-item a {
+            color: inherit;
+            text-decoration: none;
+            flex: 1;
+        }
+        .email-subject {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        .email-from {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .email-date {
+            color: #999;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            margin-left: 1rem;
+        }
+        .email-body {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin-top: 1rem;
+        }
+        .email-header {
+            border-bottom: 2px solid #eee;
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+        }
+        .email-meta {
+            margin: 0.5rem 0;
+            color: #666;
+        }
+        .email-meta strong {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📧 Privra Webmail</h1>
+        <nav>
+            {% if session.email %}
+                <span>{{ session.email }}</span>
+                <a href="{{ url_for('inbox') }}">Inbox</a>
+                <a href="{{ url_for('compose') }}">Compose</a>
+                <a href="{{ url_for('logout') }}">Logout</a>
+            {% endif %}
+        </nav>
+    </div>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

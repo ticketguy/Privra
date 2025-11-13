@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Inbox - Privra Webmail{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2>Inbox ({{ emails|length }})</h2>
+        <a href="{{ url_for('compose') }}" class="btn btn-success">Compose New</a>
+    </div>
+
+    {% if emails %}
+        <ul class="email-list">
+            {% for email in emails %}
+                <li class="email-item">
+                    <a href="{{ url_for('view_email', email_id=email.id) }}">
+                        <div class="email-subject">{{ email.subject }}</div>
+                        <div class="email-from">From: {{ email.from }}</div>
+                    </a>
+                    <div class="email-date">{{ email.date }}</div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p style="text-align: center; color: #999; padding: 3rem;">
+            No emails in inbox. Start by composing a new email!
+        </p>
+    {% endif %}
+</div>
+{% endblock %}

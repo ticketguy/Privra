@@ -6,6 +6,7 @@ A simple, reliable mail server built from scratch. No complexity, just works.
 
 - ✅ **SMTP** (Postfix) - Send and receive email
 - ✅ **IMAP** (Dovecot) - Read email from any client
+- ✅ **Webmail** - Built-in email client, no setup needed
 - ✅ **SSL/TLS** - Automatic Let's Encrypt certificates
 - ✅ **Simple Admin** - Web interface to manage users
 - ✅ **PostgreSQL** - Reliable user database
@@ -35,10 +36,17 @@ That's it! Your mail server is ready.
 
 ## Usage
 
-### Access Admin Panel
-https://mail.yourdomain.com/
+### Webmail (Built-in Email Client)
+**https://mail.yourdomain.com/mail**
 
-### Email Client Settings
+Login with your email credentials. Read, compose, and send emails instantly!
+
+### Admin Panel (User Management)
+**https://mail.yourdomain.com/**
+
+Manage users, passwords, and domains.
+
+### External Email Clients (iPhone, Gmail, Thunderbird)
 
 **IMAP (Incoming):**
 - Server: mail.yourdomain.com
@@ -54,10 +62,11 @@ https://mail.yourdomain.com/
 
 - **Postfix** - SMTP server (email sending/receiving)
 - **Dovecot** - IMAP server (email reading)
+- **Webmail** - Built-in email client (Flask)
+- **Admin** - User management interface (Flask)
 - **PostgreSQL** - User accounts database
 - **Redis** - Session storage
 - **Nginx** - SSL termination & reverse proxy
-- **Flask** - Admin web interface
 
 ## Management
 

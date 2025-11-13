@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}{{ subject }} - Privra Webmail{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="margin-bottom: 1rem;">
+        <a href="{{ url_for('inbox') }}" class="btn btn-secondary">← Back to Inbox</a>
+    </div>
+
+    <div class="email-header">
+        <h2>{{ subject }}</h2>
+        <div class="email-meta">
+            <strong>From:</strong> {{ from_addr }}
+        </div>
+        <div class="email-meta">
+            <strong>To:</strong> {{ to_addr }}
+        </div>
+        <div class="email-meta">
+            <strong>Date:</strong> {{ date }}
+        </div>
+    </div>
+
+    <div class="email-body">{{ body }}</div>
+</div>
+{% endblock %}
