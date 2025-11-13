@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL - User database
   db:
@@ -48,6 +46,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
     volumes:
       - mail-queue:/var/spool/postfix
+      - mail-storage:/var/mail
       - ./certs:/etc/ssl/mail:ro
     networks:
       - mailnet
