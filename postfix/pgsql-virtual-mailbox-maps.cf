@@ -2,4 +2,4 @@ user = %DB_USER%
 password = %DB_PASSWORD%
 hosts = db
 dbname = %DB_NAME%
-query = SELECT 1 FROM users WHERE email='%s' AND active=true
+query = SELECT domain || '/' || split_part(email, '@', 1) || '/' FROM users WHERE email='%s' AND active=true
