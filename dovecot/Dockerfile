@@ -6,6 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     dovecot-core \
     dovecot-imapd \
+    dovecot-lmtpd \
     dovecot-pgsql \
     supervisor \
     && rm -rf /var/lib/apt/lists/*
@@ -22,6 +23,6 @@ RUN chmod +x /entrypoint.sh
 # Create mail user
 RUN useradd -r -u 5000 -g mail -d /var/mail -s /sbin/nologin vmail
 
-EXPOSE 143 993 12345
+EXPOSE 143 993 12345 24
 
 CMD ["/entrypoint.sh"]
