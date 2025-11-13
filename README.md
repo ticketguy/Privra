@@ -84,6 +84,21 @@ docker compose logs -f
 - Domain with A record pointing to your server
 - Ports open: 25, 80, 443, 587, 993, 8443
 
+### Important: Port 25 (SMTP)
+
+**Cloud providers block port 25 by default** to prevent spam. You need to request it be unblocked:
+
+**DigitalOcean**: Submit a support ticket requesting port 25 access (usually approved within hours)
+**AWS/Azure**: Similar process - request via support
+**Alternatives**: Vultr, Linode, Hetzner, OVH don't block port 25
+
+Until port 25 is unblocked:
+- ✅ You can **receive** emails from anyone
+- ✅ You can send emails **internally** (user@yourdomain.com to user@yourdomain.com)
+- ❌ You **cannot send** to external servers (Gmail, Outlook, etc.)
+
+Once unblocked, your server is **fully independent** with no external dependencies.
+
 ## Support
 
 Built with simplicity in mind. If it breaks, it's easy to fix.
