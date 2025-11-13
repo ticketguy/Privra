@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """Privra Mail Admin Interface"""
 
-from flask import Flask, render_template_string, request, redirect, url_for, session, flash
+from flask import Flask, render_template_string, request, redirect, url_for, session, flash, jsonify
 import psycopg2
 import bcrypt
 import os
 import redis
 from portid_service import portid_service
+from crypto_utils import (
+    generate_email_keypair,
+    serialize_public_key,
+    serialize_private_key,
+    encrypt_private_key_with_recovery_key
+)
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'change-this-secret-key')
@@ -93,6 +99,50 @@ def logout():
     flash('Logged out successfully', 'success')
     return redirect(url_for('login'))
 
+@app.route('/api/pubkey/<email>')
+def get_public_key(email):
+    """
+    Public key lookup API endpoint
+    Returns the public key for a given email address if user exists
+    """
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT email, email_public_key FROM users WHERE email = %s AND active = TRUE",
+            (email,)
+        )
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if result and result[1]:
+            # User exists and has a public key
+            return jsonify({
+                "email": result[0],
+                "public_key": result[1],
+                "is_privra": True,
+                "encrypted": True
+            }), 200
+        elif result:
+            # User exists but no encryption keys yet
+            return jsonify({
+                "email": result[0],
+                "is_privra": True,
+                "encrypted": False,
+                "message": "User exists but hasn't set up encryption yet"
+            }), 200
+        else:
+            # User doesn't exist - external email
+            return jsonify({
+                "email": email,
+                "is_privra": False,
+                "encrypted": False
+            }), 404
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/adduser', methods=['GET', 'POST'])
 @login_required
 def adduser():
@@ -104,22 +154,59 @@ def adduser():
         # Hash password
         hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
+        # Generate recovery key (32 bytes hex - same as PortID)
+        from Crypto.Random import get_random_bytes
+        recovery_key = get_random_bytes(32).hex()
+
+        # Generate email encryption keys
+        private_key, public_key = generate_email_keypair()
+        public_key_pem = serialize_public_key(public_key)
+        private_key_pem = serialize_private_key(private_key)
+
+        # Encrypt private key with recovery key
+        encrypted_private_key = encrypt_private_key_with_recovery_key(
+            private_key_pem,
+            recovery_key
+        )
+
         try:
             conn = get_db()
             cur = conn.cursor()
             cur.execute(
-                "INSERT INTO users (email, password, domain) VALUES (%s, %s, %s)",
-                (email, hashed, domain)
+                """INSERT INTO users
+                   (email, password, domain, recovery_key, email_public_key, email_private_key_encrypted)
+                   VALUES (%s, %s, %s, %s, %s, %s)""",
+                (email, hashed, domain, recovery_key, public_key_pem, encrypted_private_key)
             )
             conn.commit()
             cur.close()
             conn.close()
+
+            # Store recovery key in session to display it once
+            session['new_user_recovery_key'] = recovery_key
+            session['new_user_email'] = email
+
             flash(f'User {email} created successfully!', 'success')
-            return redirect(url_for('index'))
+            return redirect(url_for('show_recovery_key'))
         except Exception as e:
             flash(f'Error: {str(e)}', 'error')
 
     return render_template_string(ADDUSER_TEMPLATE)
+
+@app.route('/recovery-key')
+@login_required
+def show_recovery_key():
+    """Show recovery key once after user creation"""
+    recovery_key = session.pop('new_user_recovery_key', None)
+    email = session.pop('new_user_email', None)
+
+    if not recovery_key:
+        flash('No recovery key to display', 'error')
+        return redirect(url_for('index'))
+
+    return render_template_string(RECOVERY_KEY_TEMPLATE,
+                                 recovery_key=recovery_key,
+                                 email=email)
 
 @app.route('/deluser/<email>', methods=['POST'])
 @login_required
@@ -345,6 +432,78 @@ PASSWD_TEMPLATE = '''
             <button type="submit">Update Password</button>
         </form>
     </div>
+</body>
+</html>
+'''
+
+RECOVERY_KEY_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Recovery Key - Privra Mail</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; }
+        .header { background: white; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2 { margin-bottom: 20px; color: #333; }
+        .warning { background: #fff3cd; border: 2px solid #ffc107; border-radius: 4px; padding: 15px; margin: 20px 0; }
+        .warning h3 { color: #856404; margin-bottom: 10px; }
+        .recovery-key { background: #f8f9fa; border: 2px solid #007bff; border-radius: 4px; padding: 20px; margin: 20px 0; font-family: monospace; font-size: 14px; word-break: break-all; }
+        .copy-btn { padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 10px 0; }
+        .copy-btn:hover { background: #218838; }
+        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 20px; }
+        button:hover { background: #0056b3; }
+        ul { margin: 15px 0 15px 30px; }
+        li { margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📧 Privra Mail Admin</h1>
+    </div>
+    <div class="container">
+        <h2>✅ User Created: {{ email }}</h2>
+
+        <div class="warning">
+            <h3>⚠️ IMPORTANT: Save This Recovery Key!</h3>
+            <p>This recovery key will only be shown ONCE and cannot be recovered later.</p>
+            <p><strong>The user MUST save this key to:</strong></p>
+            <ul>
+                <li>Decrypt their encrypted emails</li>
+                <li>Recover their account on a new device</li>
+                <li>Access their private encryption key</li>
+            </ul>
+        </div>
+
+        <h3>Recovery Key for {{ email }}:</h3>
+        <div class="recovery-key" id="recoveryKey">{{ recovery_key }}</div>
+
+        <button class="copy-btn" onclick="copyRecoveryKey()">📋 Copy Recovery Key</button>
+
+        <p style="margin-top: 20px; color: #666;">
+            Instruct the user to:
+        </p>
+        <ul>
+            <li>Save this key in a secure password manager</li>
+            <li>Write it down and store it safely offline</li>
+            <li>Never share it with anyone</li>
+            <li>Keep it separate from their password</li>
+        </ul>
+
+        <form action="{{ url_for('index') }}">
+            <button type="submit">Done - Return to Users</button>
+        </form>
+    </div>
+
+    <script>
+    function copyRecoveryKey() {
+        const recoveryKey = document.getElementById('recoveryKey').textContent;
+        navigator.clipboard.writeText(recoveryKey).then(() => {
+            alert('Recovery key copied to clipboard!');
+        });
+    }
+    </script>
 </body>
 </html>
 '''

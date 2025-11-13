@@ -62,6 +62,8 @@ def init_database():
             portid VARCHAR(255) UNIQUE,
             recovery_key TEXT,
             auth_type VARCHAR(20) DEFAULT 'password',
+            email_public_key TEXT,
+            email_private_key_encrypted TEXT,
             active BOOLEAN DEFAULT TRUE,
             quota_bytes BIGINT DEFAULT 1073741824,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
