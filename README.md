@@ -36,7 +36,7 @@ That's it! Your mail server is ready.
 ## Usage
 
 ### Access Admin Panel
-https://mail.yourdomain.com/admin
+https://mail.yourdomain.com/
 
 ### Email Client Settings
 
