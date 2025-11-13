@@ -88,6 +88,8 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - PORTID_APP_ID=${PORTID_APP_ID:-privra-mail-v1}
+      - PORTID_API_URL=${PORTID_API_URL:-http://localhost:5001}
     volumes:
       - ./admin:/app
     networks:
@@ -110,11 +112,21 @@ services:
       - IMAP_PORT=993
       - SMTP_HOST=postfix
       - SMTP_PORT=587
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME:-privramail}
+      - DB_USER=${DB_USER:-privramail}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - PORTID_APP_ID=${PORTID_APP_ID:-privra-mail-v1}
+      - PORTID_API_URL=${PORTID_API_URL:-http://localhost:5001}
     networks:
       - mailnet
     depends_on:
-      - dovecot
-      - postfix
+      db:
+        condition: service_healthy
+      dovecot:
+        condition: service_started
+      postfix:
+        condition: service_started
 
   # Nginx - SSL termination & reverse proxy
   nginx:

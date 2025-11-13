@@ -6,6 +6,7 @@ import psycopg2
 import bcrypt
 import os
 import redis
+from portid_service import portid_service
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'change-this-secret-key')
@@ -52,22 +53,39 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        use_portid = request.form.get('use_portid', '').lower() == 'true'
 
+        # Try PortID authentication first if enabled
+        if portid_service.is_enabled() and use_portid:
+            result = portid_service.login(username, password)
+            if result and result.get('success'):
+                # Store PortID info in session
+                session['admin_user'] = username
+                session['auth_type'] = 'portid'
+                session['portid'] = result.get('portid')
+                flash('Login successful via PortID!', 'success')
+                return redirect(url_for('index'))
+            else:
+                flash('PortID authentication failed', 'error')
+                return render_template_string(LOGIN_TEMPLATE, portid_enabled=True)
+
+        # Fall back to legacy password authentication
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT password FROM admin_users WHERE username = %s AND active = TRUE", (username,))
+        cur.execute("SELECT password, auth_type FROM admin_users WHERE username = %s AND active = TRUE", (username,))
         result = cur.fetchone()
         cur.close()
         conn.close()
 
-        if result and bcrypt.checkpw(password.encode('utf-8'), result[0].encode('utf-8')):
+        if result and result[0] and bcrypt.checkpw(password.encode('utf-8'), result[0].encode('utf-8')):
             session['admin_user'] = username
+            session['auth_type'] = result[1] or 'password'
             flash('Login successful!', 'success')
             return redirect(url_for('index'))
         else:
             flash('Invalid credentials', 'error')
 
-    return render_template_string(LOGIN_TEMPLATE)
+    return render_template_string(LOGIN_TEMPLATE, portid_enabled=portid_service.is_enabled())
 
 @app.route('/logout')
 def logout():
@@ -175,6 +193,15 @@ LOGIN_TEMPLATE = '''
         <form method="POST">
             <input type="text" name="username" placeholder="Username" required>
             <input type="password" name="password" placeholder="Password" required>
+            {% if portid_enabled %}
+            <div style="margin: 15px 0;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="use_portid" value="true" style="width: auto; margin-right: 8px;">
+                    <span style="font-size: 14px; color: #555;">Use PortID Authentication</span>
+                </label>
+                <p style="font-size: 12px; color: #888; margin: 5px 0 0 28px;">Zero-knowledge authentication via PortID</p>
+            </div>
+            {% endif %}
             <button type="submit">Login</button>
         </form>
         <p style="margin-top: 20px; text-align: center; color: #666; font-size: 12px;">Default: admin/admin (change this!)</p>

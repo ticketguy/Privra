@@ -14,6 +14,15 @@
             <label for="password">Password</label>
             <input type="password" id="password" name="password" required>
         </div>
+        {% if portid_enabled %}
+        <div class="form-group" style="margin-bottom: 1rem;">
+            <label style="display: flex; align-items: center; cursor: pointer; font-weight: normal;">
+                <input type="checkbox" name="use_portid" value="true" style="margin-right: 8px;">
+                <span style="font-size: 14px;">Use PortID Authentication</span>
+            </label>
+            <p style="font-size: 12px; color: #888; margin: 5px 0 0 28px;">Zero-knowledge authentication via PortID</p>
+        </div>
+        {% endif %}
         <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
     </form>
 </div>

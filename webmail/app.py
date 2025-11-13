@@ -10,6 +10,8 @@ from email.header import decode_header
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from datetime import datetime, timedelta
 import os
+import psycopg2
+from portid_service import portid_service
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -20,6 +22,15 @@ IMAP_HOST = os.getenv('IMAP_HOST', 'dovecot')
 IMAP_PORT = int(os.getenv('IMAP_PORT', '993'))
 SMTP_HOST = os.getenv('SMTP_HOST', 'postfix')
 SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
+
+# Database connection
+def get_db():
+    return psycopg2.connect(
+        host=os.getenv('DB_HOST', 'db'),
+        database=os.getenv('DB_NAME', 'privramail'),
+        user=os.getenv('DB_USER', 'privramail'),
+        password=os.getenv('DB_PASSWORD')
+    )
 
 def connect_imap(email_addr, password):
     """Connect to IMAP server"""
@@ -92,20 +103,52 @@ def login():
     if request.method == 'POST':
         email_addr = request.form.get('email')
         password = request.form.get('password')
+        use_portid = request.form.get('use_portid', '').lower() == 'true'
 
-        # Test IMAP connection
+        # Try PortID authentication first if enabled
+        if portid_service.is_enabled() and use_portid:
+            result = portid_service.login(email_addr, password)
+            if result and result.get('success'):
+                # Look up user's IMAP password from database
+                try:
+                    conn = get_db()
+                    cur = conn.cursor()
+                    cur.execute("SELECT email, password FROM users WHERE email = %s AND active = TRUE", (email_addr,))
+                    user_data = cur.fetchone()
+                    cur.close()
+                    conn.close()
+
+                    if user_data and user_data[1]:
+                        # Test IMAP connection with database password
+                        mail = connect_imap(user_data[0], user_data[1])
+                        if mail:
+                            mail.logout()
+                            session.permanent = True
+                            session['email'] = user_data[0]
+                            session['password'] = user_data[1]
+                            session['auth_type'] = 'portid'
+                            session['portid'] = result.get('portid')
+                            flash('Login successful via PortID!', 'success')
+                            return redirect(url_for('inbox'))
+                except Exception as e:
+                    print(f"PortID login error: {e}")
+                    flash('PortID authentication failed', 'error')
+                    return render_template('login.html', portid_enabled=True)
+
+        # Fall back to legacy IMAP authentication
         mail = connect_imap(email_addr, password)
         if mail:
             mail.logout()
             session.permanent = True
             session['email'] = email_addr
             session['password'] = password
+            session['auth_type'] = 'password'
             flash('Login successful!', 'success')
             return redirect(url_for('inbox'))
         else:
             flash('Invalid email or password', 'error')
 
-    return render_template('login.html')
+    return render_template('login.html', portid_enabled=portid_service.is_enabled())
 
 @app.route('/logout')
 def logout():

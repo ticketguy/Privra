@@ -57,8 +57,11 @@ def init_database():
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             email VARCHAR(255) UNIQUE NOT NULL,
-            password VARCHAR(255) NOT NULL,
+            password VARCHAR(255),
             domain VARCHAR(255) NOT NULL,
+            portid VARCHAR(255) UNIQUE,
+            recovery_key TEXT,
+            auth_type VARCHAR(20) DEFAULT 'password',
             active BOOLEAN DEFAULT TRUE,
             quota_bytes BIGINT DEFAULT 1073741824,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -82,7 +85,10 @@ def init_database():
         CREATE TABLE IF NOT EXISTS admin_users (
             id SERIAL PRIMARY KEY,
             username VARCHAR(255) UNIQUE NOT NULL,
-            password VARCHAR(255) NOT NULL,
+            password VARCHAR(255),
+            portid VARCHAR(255) UNIQUE,
+            recovery_key TEXT,
+            auth_type VARCHAR(20) DEFAULT 'password',
             email VARCHAR(255),
             active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
