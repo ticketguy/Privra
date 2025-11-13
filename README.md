@@ -1,50 +1,33 @@
 # Privra Mail Server
 
-A simple, reliable mail server built from scratch. No complexity, just works.
+A simple, reliable mail server built from scratch. **Plug and play** - no complex setup.
 
-## Features
-
-- ✅ **SMTP** (Postfix) - Send and receive email
-- ✅ **IMAP** (Dovecot) - Read email from any client
-- ✅ **Webmail** - Built-in email client, no setup needed
-- ✅ **SSL/TLS** - Automatic Let's Encrypt certificates
-- ✅ **Simple Admin** - Web interface to manage users
-- ✅ **PostgreSQL** - Reliable user database
-- ✅ **Redis** - Fast session storage
-
-## One-Command Setup
+## Quick Start
 
 ```bash
 git clone https://github.com/ticketguy/Privra.git
 cd Privra
+cp .env.example .env
+nano .env  # Edit your domain and passwords
 ./setup.sh
 ```
 
-That's it! Your mail server is ready.
+**That's it!** Your mail server is ready in 5 minutes.
 
-## Requirements
+## Features
 
-- Ubuntu 20.04+ server
-- Domain name pointing to your server
-- Ports 25, 80, 443, 587, 993 open
+- ✅ **Fully Working** - Send & receive emails instantly
+- ✅ **Webmail** - Built-in email client (no Gmail/Outlook needed)
+- ✅ **SMTP + IMAP** - Works with any email client
+- ✅ **SSL/TLS** - Automatic Let's Encrypt certificates
+- ✅ **Simple Admin** - Web interface to manage users
+- ✅ **PostgreSQL** - Reliable user database
+- ✅ **LMTP Delivery** - Modern, reliable mail delivery
 
-## Configuration
+## Access
 
-1. Copy `.env.example` to `.env`
-2. Edit `.env` with your domain and settings
-3. Run `./setup.sh`
-
-## Usage
-
-### Webmail (Built-in Email Client)
-**http://mail.yourdomain.com:8443**
-
-Login with your email credentials. Read, compose, and send emails instantly!
-
-### Admin Panel (User Management)
-**https://mail.yourdomain.com**
-
-Manage users, passwords, and domains.
+- **Webmail**: http://mail.yourdomain.com:8443
+- **Admin Panel**: https://mail.yourdomain.com
 
 ### External Email Clients (iPhone, Gmail, Thunderbird)
 
@@ -70,6 +53,10 @@ Manage users, passwords, and domains.
 
 ## Management
 
+### Via Admin Panel (Easy)
+Go to https://mail.yourdomain.com and manage users with the web interface.
+
+### Via Command Line
 ```bash
 # Add user
 docker compose exec admin python manage.py adduser user@domain.com password
@@ -83,6 +70,19 @@ docker compose exec admin python manage.py passwd user@domain.com newpassword
 # View logs
 docker compose logs -f
 ```
+
+## What's Next?
+
+1. **Test External Email** - Send email to Gmail/Outlook to verify delivery
+2. **Configure DNS Records** - Add SPF, DKIM, DMARC for better deliverability
+3. **Backup Setup** - Backup `/var/lib/docker/volumes/privra-mail_mail-storage`
+4. **Monitor** - Check logs regularly: `docker compose logs -f`
+
+## Requirements
+
+- Ubuntu 20.04+ server
+- Domain with A record pointing to your server
+- Ports open: 25, 80, 443, 587, 993, 8443
 
 ## Support
 
