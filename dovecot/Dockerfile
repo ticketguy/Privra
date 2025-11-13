@@ -8,8 +8,7 @@ RUN apt-get update && apt-get install -y \
     dovecot-imapd \
     dovecot-pgsql \
     supervisor \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /etc/dovecot/conf.d/*
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy configuration files
 COPY dovecot.conf /etc/dovecot/dovecot.conf
