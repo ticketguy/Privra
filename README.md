@@ -37,12 +37,12 @@ That's it! Your mail server is ready.
 ## Usage
 
 ### Webmail (Built-in Email Client)
-**https://mail.yourdomain.com/mail**
+**http://mail.yourdomain.com:8443**
 
 Login with your email credentials. Read, compose, and send emails instantly!
 
 ### Admin Panel (User Management)
-**https://mail.yourdomain.com/**
+**https://mail.yourdomain.com**
 
 Manage users, passwords, and domains.
 

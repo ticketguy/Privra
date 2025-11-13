@@ -103,6 +103,8 @@ services:
   webmail:
     build: ./webmail
     restart: always
+    ports:
+      - "8443:5001"
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - IMAP_HOST=dovecot

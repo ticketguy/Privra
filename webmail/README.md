@@ -16,8 +16,10 @@ Simple, fast webmail client for Privra Mail Server.
 Once deployed, access webmail at:
 
 ```
-https://mail.yourdomain.com/mail
+http://mail.yourdomain.com:8443
 ```
+
+Note: Webmail runs on port 8443 (HTTP). SSL/TLS is handled by the mail connections (IMAP/SMTP), not the web interface.
 
 ## Login
 
