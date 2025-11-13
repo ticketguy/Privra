@@ -1,131 +1,130 @@
+version: '3.8'
+
 services:
-  # Redis - Caching and session management
-  redis:
-    image: redis:alpine
+  # PostgreSQL - User database
+  db:
+    image: postgres:15-alpine
     restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-privramail}
+      POSTGRES_USER: ${DB_USER:-privramail}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - "./data/redis:/data"
+      - db-data:/var/lib/postgresql/data
     networks:
       - mailnet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-privramail}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Front - Custom Nginx (bypassing broken Mailu template)
-  front:
+  # Redis - Session storage
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - mailnet
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Postfix - SMTP server
+  postfix:
+    build: ./postfix
+    restart: always
+    hostname: ${MAIL_HOSTNAME}
+    environment:
+      - MAIL_DOMAIN=${MAIL_DOMAIN}
+      - MAIL_HOSTNAME=${MAIL_HOSTNAME}
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME:-privramail}
+      - DB_USER=${DB_USER:-privramail}
+      - DB_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - mail-queue:/var/spool/postfix
+      - ./certs:/etc/ssl/mail:ro
+    networks:
+      - mailnet
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Dovecot - IMAP server
+  dovecot:
+    build: ./dovecot
+    restart: always
+    hostname: ${MAIL_HOSTNAME}
+    environment:
+      - MAIL_DOMAIN=${MAIL_DOMAIN}
+      - MAIL_HOSTNAME=${MAIL_HOSTNAME}
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME:-privramail}
+      - DB_USER=${DB_USER:-privramail}
+      - DB_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - mail-storage:/var/mail
+      - ./certs:/etc/ssl/mail:ro
+    networks:
+      - mailnet
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Admin - Web interface
+  admin:
+    build: ./admin
+    restart: always
+    environment:
+      - MAIL_DOMAIN=${MAIL_DOMAIN}
+      - SECRET_KEY=${SECRET_KEY}
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME:-privramail}
+      - DB_USER=${DB_USER:-privramail}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./admin:/app
+    networks:
+      - mailnet
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Nginx - SSL termination & reverse proxy
+  nginx:
     image: nginx:alpine
     restart: always
     ports:
-      - "80:80"      # HTTP
-      - "443:443"    # HTTPS
-      - "25:25"      # SMTP
-      - "465:465"    # SMTPS
-      - "587:587"    # Submission
-      - "110:110"    # POP3
-      - "995:995"    # POP3S
-      - "143:143"    # IMAP
-      - "993:993"    # IMAPS
+      - "80:80"
+      - "443:443"
+      - "25:25"
+      - "587:587"
+      - "993:993"
     volumes:
-      - "./certs:/certs:ro"
-      - "./custom-nginx.conf:/etc/nginx/nginx.conf:ro"
-    networks:
-      - mailnet
-
-  # Resolver - DNS resolution
-  resolver:
-    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}unbound:${MAILU_VERSION:-2.0}
-    env_file: .env
-    restart: always
-    networks:
-      mailnet:
-        ipv4_address: 192.168.203.254
-
-  # Admin - Web administration interface
-  admin:
-    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}admin:${MAILU_VERSION:-2.0}
-    restart: always
-    env_file: .env
-    volumes:
-      - "./data:/data"
-      - "./dkim:/dkim"
-    networks:
-      - mailnet
-    dns:
-      - 192.168.203.254
-    depends_on:
-      - redis
-      - resolver
-
-  # IMAP - Dovecot mail server
-  imap:
-    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}dovecot:${MAILU_VERSION:-2.0}
-    restart: always
-    env_file: .env
-    volumes:
-      - "./mail:/mail"
-      - "./overrides/dovecot:/overrides:ro"
-      - "./certs:/certs:ro"
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/ssl/mail:ro
     networks:
       - mailnet
     depends_on:
-      - front
-
-  # SMTP - Postfix mail transfer agent
-  smtp:
-    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}postfix:${MAILU_VERSION:-2.0}
-    restart: always
-    env_file: .env
-    volumes:
-      - "./mailqueue:/queue"
-      - "./overrides/postfix:/overrides:ro"
-      - "./certs:/certs:ro"
-    networks:
-      - mailnet
-    depends_on:
-      - front
-      - resolver
-
-  # Antispam - Rspamd spam filter
-  antispam:
-    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}rspamd:${MAILU_VERSION:-2.0}
-    restart: always
-    env_file: .env
-    volumes:
-      - "./filter:/var/lib/rspamd"
-      - "./overrides/rspamd:/overrides:ro"
-    networks:
-      - mailnet
-    depends_on:
-      - front
-      - redis
-      - resolver
-
-  # Webmail - Roundcube (optional but recommended for seeing it work)
-  webmail:
-    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}webmail:${MAILU_VERSION:-2.0}
-    restart: always
-    env_file: .env
-    volumes:
-      - "./webmail:/data"
-      - "./overrides/webmail:/overrides:ro"
-    networks:
-      - mailnet
-    depends_on:
-      - imap
-
-  # Fetchmail - Optional: fetch emails from external accounts
-  # fetchmail:
-  #   image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}fetchmail:${MAILU_VERSION:-2.0}
-  #   restart: always
-  #   env_file: .env
-  #   networks:
-  #     - mailnet
-  #   depends_on:
-  #     - admin
-  #     - smtp
-  #     - imap
+      - postfix
+      - dovecot
+      - admin
 
 networks:
   mailnet:
     driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 192.168.203.0/24
+
+volumes:
+  db-data:
+  redis-data:
+  mail-storage:
+  mail-queue:
