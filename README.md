@@ -28,8 +28,11 @@ A complete, self-hosted email solution built on Postfix, Dovecot, and modern cry
 ### Phase 5: Pay-to-Send Economic Layer
 - **💰 Consent System**: Require consent from unknown senders
 - **⚡ Lightning Payments**: Micropayments to reach your inbox (Bitcoin satoshis)
+- **🤖 X402 Protocol**: HTTP 402 payments for AI agents (Solana & Base)
+- **💵 USDC Micropayments**: Gasless payments as low as $0.01
 - **✅ Whitelist/Blacklist**: Fine-grained sender control
 - **🔒 Whitelist Mode**: Only accept emails from approved senders
+- **🌐 Multi-Chain**: Supports Solana and Base (EVM) blockchains
 
 ### Advanced Features
 - **🆔 PortID Ready**: Optional zero-knowledge authentication integration
@@ -160,6 +163,64 @@ Copy the DKIM record from logs and add it to your DNS.
 **📨 Received Normally**
 - Fully compatible with existing email
 - Can be encrypted on receipt (optional gateway encryption)
+
+---
+
+## 🤖 X402 Payment Protocol
+
+### What is X402?
+
+X402 is an internet-native micropayment protocol built by Coinbase that uses **HTTP 402 (Payment Required)** for seamless transactions. Perfect for AI agents and spam prevention.
+
+### How It Works for Email
+
+1. **Unauthorized email arrives** → Consent system checks sender
+2. **Payment required** → Returns HTTP 402 with payment details
+3. **AI agent pays** → Sends USDC on Solana or Base
+4. **Payment verified** → Email automatically delivered
+5. **Sender approved** → Future emails pass through free
+
+### Supported Networks
+
+- **Solana Mainnet/Devnet** - USDC SPL token
+- **Base Mainnet/Sepolia** - USDC ERC-20
+- Gasless transactions (facilitator pays gas)
+- Micropayments as low as $0.01
+
+### AI Agent Integration
+
+```javascript
+// AI agent sends email
+POST smtp://mail.privra.xyz
+→ Returns: 402 Payment Required
+
+// Agent receives payment URL
+GET https://admin.privra.xyz/x402/pay/token
+→ Returns: X402 payment requirement
+
+// Agent pays via X402 protocol
+POST /x402/verify/token
+Headers: X-PAYMENT: base64(payment_proof)
+→ Returns: Payment verified
+
+// Email automatically delivered
+```
+
+### Configuration
+
+Set up your payment addresses in `.env`:
+
+```bash
+X402_SOLANA_ADDRESS=your-solana-wallet
+X402_BASE_ADDRESS=your-evm-wallet
+X402_DEFAULT_AMOUNT_USDC=0.01
+X402_DEFAULT_NETWORK=base-sepolia
+```
+
+Enable in admin panel:
+- Navigate to user → Consent Settings
+- Enable "Require payment"
+- Set payment amount
 
 ---
 
