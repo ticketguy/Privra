@@ -8,6 +8,7 @@ import sys
 import email
 import psycopg2
 import os
+import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -76,10 +77,14 @@ def encrypt_incoming_email(msg, recipient_email):
         # Encrypt the body
         encrypted_body = encrypt_email_content(body, public_key)
 
-        # Create new message with encrypted body
-        new_msg = MIMEMultipart() if msg.is_multipart() else MIMEText(encrypted_body)
+        if not encrypted_body:
+            print(f"Warning: Failed to encrypt email body", file=sys.stderr)
+            return msg, False
 
-        # Copy headers
+        # Create new message with encrypted body
+        new_msg = MIMEText(encrypted_body, 'plain')
+
+        # Copy headers (except content headers)
         for header, value in msg.items():
             if header.lower() not in ['content-type', 'content-transfer-encoding', 'mime-version']:
                 new_msg[header] = value
@@ -88,17 +93,27 @@ def encrypt_incoming_email(msg, recipient_email):
         new_msg['X-Privra-Encrypted'] = 'true'
         new_msg['X-Privra-Gateway-Encrypted'] = 'true'
 
-        # Set encrypted body
-        if msg.is_multipart():
-            new_msg.attach(MIMEText(encrypted_body, 'plain'))
-        else:
-            new_msg.set_payload(encrypted_body)
-
         return new_msg, True
 
     except Exception as e:
         print(f"Encryption error: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return msg, False
+
+def reinject_email(msg, sender, recipient):
+    """Reinject email back to Postfix for delivery to Dovecot"""
+    try:
+        # Connect to Postfix reinject port
+        smtp = smtplib.SMTP('localhost', 10026)
+        smtp.send_message(msg, sender, [recipient])
+        smtp.quit()
+        return True
+    except Exception as e:
+        print(f"Reinject error: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        return False
 
 def main():
     """Main content filter"""
@@ -106,6 +121,11 @@ def main():
         # Read email from stdin
         raw_email = sys.stdin.buffer.read()
         msg = email.message_from_bytes(raw_email)
+
+        # Get sender
+        sender = msg.get('From', '').strip()
+        if '<' in sender:
+            sender = sender.split('<')[1].split('>')[0].strip()
 
         # Get recipient from To header
         recipient = msg.get('To', '').strip()
@@ -116,21 +136,22 @@ def main():
         # Try to encrypt
         new_msg, encrypted = encrypt_incoming_email(msg, recipient)
 
-        # Output to stdout for delivery
-        sys.stdout.buffer.write(new_msg.as_bytes())
-
-        if encrypted:
-            print(f"Encrypted incoming email for {recipient}", file=sys.stderr)
+        # Reinject back to Postfix for delivery to Dovecot
+        if reinject_email(new_msg, sender, recipient):
+            if encrypted:
+                print(f"Encrypted and reinjected incoming email for {recipient}", file=sys.stderr)
+            else:
+                print(f"Passed through email for {recipient} (no encryption needed)", file=sys.stderr)
+            return 0
         else:
-            print(f"Passed through email for {recipient} (no encryption)", file=sys.stderr)
-
-        return 0
+            print(f"Failed to reinject email for {recipient}", file=sys.stderr)
+            return 75  # EX_TEMPFAIL
 
     except Exception as e:
         print(f"Content filter error: {e}", file=sys.stderr)
-        # On error, output original email
-        sys.stdout.buffer.write(raw_email)
-        return 1
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        return 75  # EX_TEMPFAIL
 
 if __name__ == '__main__':
     sys.exit(main())

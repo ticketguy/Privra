@@ -8,6 +8,7 @@ import sys
 import email
 import psycopg2
 import os
+import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -104,10 +105,14 @@ def decrypt_outgoing_email(msg, sender_email, recipient_email):
         # Decrypt the body
         decrypted_body = decrypt_email_content(encrypted_body, private_key)
 
-        # Create new message with decrypted body
-        new_msg = MIMEMultipart() if msg.is_multipart() else MIMEText(decrypted_body)
+        if not decrypted_body:
+            print(f"Warning: Failed to decrypt email body", file=sys.stderr)
+            return msg, False
 
-        # Copy headers (except encryption headers)
+        # Create new message with decrypted body
+        new_msg = MIMEText(decrypted_body, 'plain')
+
+        # Copy headers (except encryption and content headers)
         for header, value in msg.items():
             if header.lower() not in ['content-type', 'content-transfer-encoding',
                                        'mime-version', 'x-privra-encrypted',
@@ -117,17 +122,27 @@ def decrypt_outgoing_email(msg, sender_email, recipient_email):
         # Add gateway decryption header
         new_msg['X-Privra-Gateway-Decrypted'] = 'true'
 
-        # Set decrypted body
-        if msg.is_multipart():
-            new_msg.attach(MIMEText(decrypted_body, 'plain'))
-        else:
-            new_msg.set_payload(decrypted_body)
-
         return new_msg, True
 
     except Exception as e:
         print(f"Decryption error: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return msg, False
+
+def reinject_email(msg, sender, recipient):
+    """Reinject email back to Postfix for delivery"""
+    try:
+        # Connect to Postfix reinject port
+        smtp = smtplib.SMTP('localhost', 10027)
+        smtp.send_message(msg, sender, [recipient])
+        smtp.quit()
+        return True
+    except Exception as e:
+        print(f"Reinject error: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        return False
 
 def main():
     """Main content filter"""
@@ -148,21 +163,22 @@ def main():
         # Try to decrypt if needed
         new_msg, decrypted = decrypt_outgoing_email(msg, sender, recipient)
 
-        # Output to stdout for delivery
-        sys.stdout.buffer.write(new_msg.as_bytes())
-
-        if decrypted:
-            print(f"Decrypted outgoing email from {sender} to external {recipient}", file=sys.stderr)
+        # Reinject back to Postfix for actual delivery
+        if reinject_email(new_msg, sender, recipient):
+            if decrypted:
+                print(f"Decrypted and reinjected email from {sender} to {recipient}", file=sys.stderr)
+            else:
+                print(f"Passed through email from {sender} to {recipient} (no decryption needed)", file=sys.stderr)
+            return 0
         else:
-            print(f"Passed through email from {sender} to {recipient} (no decryption)", file=sys.stderr)
-
-        return 0
+            print(f"Failed to reinject email from {sender} to {recipient}", file=sys.stderr)
+            return 75  # EX_TEMPFAIL
 
     except Exception as e:
         print(f"Content filter error: {e}", file=sys.stderr)
-        # On error, output original email
-        sys.stdout.buffer.write(raw_email)
-        return 1
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        return 75  # EX_TEMPFAIL
 
 if __name__ == '__main__':
     sys.exit(main())
