@@ -66,6 +66,8 @@ localhost:10026 inet  n       -       n       -       10      smtpd
   -o smtpd_relay_restrictions=permit_mynetworks,reject_unauth_destination
   -o mynetworks=127.0.0.0/8
   -o smtpd_authorized_xforward_hosts=127.0.0.0/8
+  -o smtpd_milters=inet:localhost:8891
+  -o non_smtpd_milters=inet:localhost:8891
 
 # Reinject filtered mail back into Postfix (for outgoing decryption to internet)
 localhost:10027 inet  n       -       n       -       10      smtpd
@@ -78,6 +80,8 @@ localhost:10027 inet  n       -       n       -       10      smtpd
   -o smtpd_data_restrictions=
   -o mynetworks=127.0.0.0/8,[::1]/128
   -o smtpd_authorized_xforward_hosts=127.0.0.0/8,[::1]/128
+  -o smtpd_milters=inet:localhost:8891
+  -o non_smtpd_milters=inet:localhost:8891
 
 # Consent policy service
 consent  unix  -       n       n       -       0       spawn
