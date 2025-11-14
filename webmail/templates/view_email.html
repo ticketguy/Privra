@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}{{ subject }} - Privra Webmail{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="margin-bottom: 1rem;">
+        <a href="{{ url_for('inbox') }}" class="btn btn-secondary">← Back to Inbox</a>
+    </div>
+
+    <div class="email-header">
+        <h2>{{ subject }}</h2>
+
+        <!-- Encryption Badge -->
+        {% if is_encrypted %}
+        <div style="display: inline-block; background: #d4edda; color: #155724; padding: 5px 10px; border-radius: 4px; font-size: 12px; margin-left: 10px;">
+            🔒 End-to-end Encrypted
+        </div>
+        {% endif %}
+
+        <div class="email-meta">
+            <strong>From:</strong> {{ from_addr }}
+        </div>
+        <div class="email-meta">
+            <strong>To:</strong> {{ to_addr }}
+        </div>
+        <div class="email-meta">
+            <strong>Date:</strong> {{ date }}
+        </div>
+    </div>
+
+    <div class="email-body" id="emailBody">
+        {% if is_encrypted %}
+        <div style="padding: 20px; text-align: center; color: #666;">
+            <div class="spinner" style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <p style="margin-top: 10px;">Decrypting message...</p>
+        </div>
+        <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        </style>
+        {% else %}
+        {{ body }}
+        {% endif %}
+    </div>
+</div>
+
+{% if is_encrypted %}
+<script src="{{ url_for('static', filename='crypto.js') }}"></script>
+<script>
+(async function() {
+    try {
+        // Get user's private key
+        const response = await fetch('/api/private-key');
+        if (!response.ok) {
+            throw new Error('Failed to load private key');
+        }
+
+        const keyData = await response.json();
+        const privateKey = await PrivraCrypto.importPrivateKey(keyData.private_key);
+
+        // Decrypt the email body
+        const encryptedBody = `{{ body | safe }}`;
+        const decryptedText = await PrivraCrypto.decryptText(encryptedBody, privateKey);
+
+        // Display decrypted text
+        document.getElementById('emailBody').innerHTML = '<pre style="white-space: pre-wrap; word-wrap: break-word; font-family: inherit;">' +
+            escapeHtml(decryptedText) + '</pre>';
+
+    } catch (error) {
+        console.error('Decryption error:', error);
+        document.getElementById('emailBody').innerHTML =
+            '<div style="color: #dc3545; padding: 20px; text-align: center;">' +
+            '<p>⚠️ Failed to decrypt email</p>' +
+            '<p style="font-size: 12px;">Error: ' + error.message + '</p>' +
+            '</div>';
+    }
+})();
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endif %}
+{% endblock %}

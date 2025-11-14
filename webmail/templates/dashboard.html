@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Privra Webmail{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto;">
+    <h2 style="margin-bottom: 2rem;">Welcome, {{ session.email }}</h2>
+
+    <!-- Quick Stats -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+        <!-- Inbox Stats -->
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #3498db;">📬</div>
+            <div class="stat-content">
+                <div class="stat-value">{{ total_emails }}</div>
+                <div class="stat-label">Total Emails</div>
+                <div class="stat-sublabel">{{ unread_count }} unread</div>
+            </div>
+        </div>
+
+        <!-- Encryption Status -->
+        <div class="stat-card">
+            <div class="stat-icon" style="background: {% if has_encryption %}#27ae60{% else %}#e74c3c{% endif %};">
+                {% if has_encryption %}🔒{% else %}🔓{% endif %}
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{% if has_encryption %}Enabled{% else %}Disabled{% endif %}</div>
+                <div class="stat-label">Encryption</div>
+                <div class="stat-sublabel">{% if has_encryption %}End-to-end encrypted{% else %}Not configured{% endif %}</div>
+            </div>
+        </div>
+
+        <!-- Consent Protection -->
+        <div class="stat-card">
+            <div class="stat-icon" style="background: {% if require_consent or whitelist_mode %}#27ae60{% else %}#95a5a6{% endif %};">
+                🛡️
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{% if whitelist_mode %}Whitelist{% elif require_consent %}Consent{% else %}Off{% endif %}</div>
+                <div class="stat-label">Privacy Mode</div>
+                <div class="stat-sublabel">
+                    {% if whitelist_mode %}Only whitelist allowed{% elif require_consent %}Consent required{% else %}All emails accepted{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Whitelist/Blacklist -->
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #9b59b6;">📋</div>
+            <div class="stat-content">
+                <div class="stat-value">{{ whitelist_count + blacklist_count }}</div>
+                <div class="stat-label">Filtered Senders</div>
+                <div class="stat-sublabel">{{ whitelist_count }} allowed, {{ blacklist_count }} blocked</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feature Highlights -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <h3 style="margin-top: 0;">🎯 Your Privra Features</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+            <!-- E2E Encryption -->
+            <div class="feature-box">
+                <div style="font-size: 2em; margin-bottom: 0.5rem;">🔐</div>
+                <h4 style="margin: 0 0 0.5rem 0;">End-to-End Encryption</h4>
+                <p style="color: #666; font-size: 0.9em; margin: 0;">
+                    Your emails to other Privra users are encrypted in the browser before sending.
+                    Only the recipient can decrypt them.
+                </p>
+                <div style="margin-top: 0.75rem;">
+                    <span class="badge {% if has_encryption %}badge-success{% else %}badge-warning{% endif %}">
+                        {% if has_encryption %}✓ Active{% else %}⚠ Setup Required{% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Gateway Encryption -->
+            <div class="feature-box">
+                <div style="font-size: 2em; margin-bottom: 0.5rem;">🌐</div>
+                <h4 style="margin: 0 0 0.5rem 0;">Gateway Encryption</h4>
+                <p style="color: #666; font-size: 0.9em; margin: 0;">
+                    Emails from external senders (Gmail, Outlook) are automatically encrypted
+                    when they reach our server.
+                </p>
+                <div style="margin-top: 0.75rem;">
+                    <span class="badge badge-success">✓ Active</span>
+                </div>
+            </div>
+
+            <!-- AI Categorization -->
+            <div class="feature-box">
+                <div style="font-size: 2em; margin-bottom: 0.5rem;">🤖</div>
+                <h4 style="margin: 0 0 0.5rem 0;">Smart Categorization</h4>
+                <p style="color: #666; font-size: 0.9em; margin: 0;">
+                    Emails are automatically sorted into Priority, Social, Updates, Promotions,
+                    and Spam categories.
+                </p>
+                <div style="margin-top: 0.75rem;">
+                    <span class="badge badge-info">🔮 Rule-based (LLM coming soon)</span>
+                </div>
+            </div>
+
+            <!-- Consent System -->
+            <div class="feature-box">
+                <div style="font-size: 2em; margin-bottom: 0.5rem;">✋</div>
+                <h4 style="margin: 0 0 0.5rem 0;">Consent-to-Send</h4>
+                <p style="color: #666; font-size: 0.9em; margin: 0;">
+                    Control who can email you. Require consent from unknown senders or use
+                    whitelist-only mode.
+                </p>
+                <div style="margin-top: 0.75rem;">
+                    <span class="badge {% if require_consent or whitelist_mode %}badge-success{% else %}badge-secondary{% endif %}">
+                        {% if require_consent or whitelist_mode %}✓ Enabled{% else %}○ Available{% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <!-- PortID Auth -->
+            <div class="feature-box">
+                <div style="font-size: 2em; margin-bottom: 0.5rem;">🔑</div>
+                <h4 style="margin: 0 0 0.5rem 0;">PortID Authentication</h4>
+                <p style="color: #666; font-size: 0.9em; margin: 0;">
+                    Optional zero-knowledge authentication using PortID for enhanced privacy
+                    and cross-platform identity.
+                </p>
+                <div style="margin-top: 0.75rem;">
+                    <span class="badge badge-info">○ Optional</span>
+                </div>
+            </div>
+
+            <!-- Pay-to-Send (Future) -->
+            <div class="feature-box">
+                <div style="font-size: 2em; margin-bottom: 0.5rem;">💰</div>
+                <h4 style="margin: 0 0 0.5rem 0;">Pay-to-Send Gateway</h4>
+                <p style="color: #666; font-size: 0.9em; margin: 0;">
+                    Future feature: Require payment from unknown senders, creating a
+                    crypto-economic spam barrier.
+                </p>
+                <div style="margin-top: 0.75rem;">
+                    <span class="badge badge-secondary">🚧 Coming Soon</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card">
+        <h3 style="margin-top: 0;">Quick Actions</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <a href="{{ url_for('inbox') }}" class="action-btn">
+                <span style="font-size: 1.5em;">📬</span>
+                <span>View Inbox</span>
+            </a>
+            <a href="{{ url_for('compose') }}" class="action-btn">
+                <span style="font-size: 1.5em;">✍️</span>
+                <span>Compose Email</span>
+            </a>
+            <a href="{{ url_for('consent_settings') }}" class="action-btn">
+                <span style="font-size: 1.5em;">⚙️</span>
+                <span>Privacy Settings</span>
+            </a>
+            <a href="{{ url_for('account_settings') }}" class="action-btn">
+                <span style="font-size: 1.5em;">👤</span>
+                <span>Account Settings</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+.stat-icon {
+    font-size: 2em;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.stat-content {
+    flex: 1;
+}
+.stat-value {
+    font-size: 1.75em;
+    font-weight: bold;
+    color: #2c3e50;
+}
+.stat-label {
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 0.25rem;
+}
+.stat-sublabel {
+    font-size: 0.8em;
+    color: #999;
+    margin-top: 0.25rem;
+}
+.feature-box {
+    padding: 1.5rem;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+.feature-box:hover {
+    border-color: #3498db;
+    box-shadow: 0 4px 8px rgba(52, 152, 219, 0.2);
+}
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+.badge-success {
+    background: #d4edda;
+    color: #155724;
+}
+.badge-warning {
+    background: #fff3cd;
+    color: #856404;
+}
+.badge-info {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+.badge-secondary {
+    background: #e2e3e5;
+    color: #383d41;
+}
+.action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #2c3e50;
+    transition: all 0.3s;
+}
+.action-btn:hover {
+    background: #e9ecef;
+    border-color: #3498db;
+    transform: translateY(-2px);
+}
+</style>
+{% endblock %}

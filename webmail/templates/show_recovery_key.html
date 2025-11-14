@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Recovery Key - Privra Webmail{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 700px; margin: 2rem auto;">
+    <h2 style="text-align: center; margin-bottom: 1rem;">Your Recovery Key</h2>
+    <p style="text-align: center; color: #666; margin-bottom: 2rem;">
+        Account created for: <strong>{{ email }}</strong>
+    </p>
+
+    <div style="background: #f8d7da; border: 2px solid #dc3545; color: #721c24; padding: 20px; border-radius: 8px; margin-bottom: 2rem;">
+        <h3 style="margin-top: 0; color: #721c24;">⚠️ IMPORTANT - Save This Key Immediately</h3>
+        <p><strong>This is your ONLY chance to see this recovery key.</strong></p>
+        <p>You will need this key to:</p>
+        <ul style="margin-left: 20px;">
+            <li>Decrypt your encrypted emails if you forget your password</li>
+            <li>Recover access to your encryption keys</li>
+            <li>Migrate your account to a new device</li>
+        </ul>
+        <p style="margin-bottom: 0;"><strong>We CANNOT recover this key if you lose it. Store it securely.</strong></p>
+    </div>
+
+    <div style="background: #2c3e50; color: white; padding: 20px; border-radius: 8px; margin-bottom: 2rem;">
+        <label style="display: block; margin-bottom: 10px; font-weight: bold; font-size: 1.1em;">Your Recovery Key:</label>
+        <div style="background: #34495e; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 1em; word-break: break-all; user-select: all;">
+            {{ recovery_key }}
+        </div>
+        <button onclick="copyRecoveryKey()" class="btn btn-primary" style="margin-top: 15px; width: 100%;">
+            📋 Copy to Clipboard
+        </button>
+    </div>
+
+    <div style="background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; padding: 15px; border-radius: 5px; margin-bottom: 2rem;">
+        <strong>How to store your recovery key safely:</strong>
+        <ol style="margin: 10px 0 0 20px;">
+            <li>Write it down on paper and store it in a safe place</li>
+            <li>Save it to a password manager (1Password, Bitwarden, etc.)</li>
+            <li>Store it in an encrypted file on secure storage</li>
+            <li><strong>DO NOT</strong> store it in plain text files or emails</li>
+        </ol>
+    </div>
+
+    <form method="POST" action="{{ url_for('confirm_recovery_key') }}">
+        <div style="background: #fff3cd; border: 1px solid #ffeeba; padding: 15px; border-radius: 5px; margin-bottom: 1.5rem;">
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="confirm" required style="margin-right: 10px; width: 18px; height: 18px;">
+                <span>I have securely saved my recovery key and understand I cannot recover it later</span>
+            </label>
+        </div>
+
+        <button type="submit" class="btn btn-success" style="width: 100%;" id="continueBtn" disabled>
+            Continue to Login →
+        </button>
+    </form>
+</div>
+
+<script>
+function copyRecoveryKey() {
+    const key = "{{ recovery_key }}";
+    navigator.clipboard.writeText(key).then(() => {
+        alert('Recovery key copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+    });
+}
+
+document.getElementById('confirm').addEventListener('change', function() {
+    document.getElementById('continueBtn').disabled = !this.checked;
+});
+</script>
+
+<style>
+.btn-success {
+    background: #27ae60;
+    color: white;
+}
+.btn-success:disabled {
+    background: #95a5a6;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Privra Webmail{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 400px; margin: 4rem auto;">
+    <h2 style="margin-bottom: 1.5rem; text-align: center;">Login to Webmail</h2>
+    <form method="POST">
+        <div class="form-group">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" name="email" required autofocus>
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        {% if portid_enabled %}
+        <div class="form-group" style="margin-bottom: 1rem;">
+            <label style="display: flex; align-items: center; cursor: pointer; font-weight: normal;">
+                <input type="checkbox" name="use_portid" value="true" style="margin-right: 8px;">
+                <span style="font-size: 14px;">Use PortID Authentication</span>
+            </label>
+            <p style="font-size: 12px; color: #888; margin: 5px 0 0 28px;">Zero-knowledge authentication via PortID</p>
+        </div>
+        {% endif %}
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+    </form>
+
+    <div style="text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #eee;">
+        <p style="color: #666; margin-bottom: 0.5rem;">Don't have an account?</p>
+        <a href="{{ url_for('register') }}" class="btn btn-success" style="width: 100%;">Create New Account</a>
+    </div>
+</div>
+{% endblock %}

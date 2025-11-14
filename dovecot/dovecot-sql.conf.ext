@@ -1,0 +1,17 @@
+# Database driver
+driver = pgsql
+
+# Database connection
+connect = host=db dbname=%DB_NAME% user=%DB_USER% password=%DB_PASSWORD%
+
+# Default password scheme
+default_pass_scheme = BLF-CRYPT
+
+# Password query
+password_query = SELECT email as user, password FROM users WHERE email='%u' AND active=true
+
+# User query
+user_query = SELECT '/var/mail/%d/%n' as home, 'maildir:/var/mail/%d/%n' as mail, 5000 AS uid, 8 AS gid FROM users WHERE email='%u' AND active=true
+
+# Iterate query for user listing
+iterate_query = SELECT email as user FROM users WHERE active=true

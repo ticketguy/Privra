@@ -1,120 +1,164 @@
 #!/bin/bash
-
-###################################
-# Privra Mail Server Setup Script
-###################################
-
 set -e
 
-echo "🚀 Privra Mail Server Setup"
-echo "============================="
+echo "=========================================="
+echo "  Privra Mail Server Setup"
+echo "=========================================="
 echo ""
 
 # Check if running as root
-if [ "$EUID" -ne 0 ]; then
-    echo "❌ Please run as root (use: sudo ./setup.sh)"
+if [ "$EUID" -eq 0 ]; then
+    echo "❌ Please don't run this script as root"
+    echo "   Run as regular user with sudo access"
     exit 1
 fi
 
-# Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-    echo "📦 Docker not found. Installing Docker..."
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh
-    rm get-docker.sh
-    systemctl enable docker
-    systemctl start docker
-    echo "✅ Docker installed successfully"
-else
-    echo "✅ Docker is already installed"
-fi
-
-# Check if Docker Compose is available
-if ! docker compose version &> /dev/null; then
-    echo "❌ Docker Compose not found. Please install Docker Compose plugin."
-    exit 1
-else
-    echo "✅ Docker Compose is available"
-fi
-
-# Create .env from .env.example if it doesn't exist
+# Check if .env exists
 if [ ! -f .env ]; then
-    if [ -f .env.example ]; then
-        echo "📋 Creating .env from .env.example..."
-        cp .env.example .env
-        echo "✅ .env file created"
+    echo "❌ .env file not found!"
+    echo ""
+    echo "Steps to configure:"
+    echo "1. cp .env.example .env"
+    echo "2. Edit .env with your settings"
+    echo "3. Run this script again"
+    exit 1
+fi
+
+# Load environment variables
+source .env
+
+# Validate required variables
+if [ -z "$MAIL_DOMAIN" ] || [ -z "$MAIL_HOSTNAME" ] || [ -z "$DB_PASSWORD" ] || [ -z "$SECRET_KEY" ]; then
+    echo "❌ Missing required variables in .env"
+    echo "   Please configure MAIL_DOMAIN, MAIL_HOSTNAME, DB_PASSWORD, and SECRET_KEY"
+    exit 1
+fi
+
+echo "✓ Configuration loaded"
+echo "  Domain: $MAIL_DOMAIN"
+echo "  Hostname: $MAIL_HOSTNAME"
+echo ""
+
+# Install Docker if not installed
+if ! command -v docker &> /dev/null; then
+    echo "📦 Installing Docker..."
+    curl -fsSL https://get.docker.com | sh
+    sudo usermod -aG docker $USER
+    echo "✓ Docker installed"
+    echo "⚠️  Please logout and login again to use Docker without sudo"
+    exit 0
+fi
+
+# Install Docker Compose if not installed
+if ! command -v docker &> /dev/null || ! docker compose version &> /dev/null; then
+    echo "📦 Installing Docker Compose..."
+    sudo apt-get update
+    sudo apt-get install -y docker-compose-plugin
+    echo "✓ Docker Compose installed"
+fi
+
+# Setup Let's Encrypt certificates
+echo ""
+echo "🔐 Setting up SSL certificates..."
+echo ""
+
+# Install certbot if not installed
+if ! command -v certbot &> /dev/null; then
+    echo "Installing certbot..."
+    sudo apt-get update
+    sudo apt-get install -y certbot
+fi
+
+# Create certs directory
+mkdir -p certs
+
+# Check if certificates already exist
+if [ -d "/etc/letsencrypt/live/$MAIL_HOSTNAME" ]; then
+    echo "✓ Certificates already exist, copying..."
+    sudo cp /etc/letsencrypt/live/$MAIL_HOSTNAME/fullchain.pem certs/
+    sudo cp /etc/letsencrypt/live/$MAIL_HOSTNAME/privkey.pem certs/
+    sudo chown $USER:$USER certs/*.pem
+else
+    echo "Obtaining Let's Encrypt certificates..."
+    echo "⚠️  Make sure:"
+    echo "   - Port 80 is open"
+    echo "   - DNS A record for $MAIL_HOSTNAME points to this server"
+    echo ""
+    read -p "Continue? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Setup cancelled"
+        exit 1
+    fi
+
+    sudo certbot certonly --standalone \
+        -d $MAIL_HOSTNAME \
+        --non-interactive \
+        --agree-tos \
+        --email ${ADMIN_EMAIL:-admin@$MAIL_DOMAIN} \
+        --preferred-challenges http
+
+    if [ $? -eq 0 ]; then
+        echo "✓ Certificates obtained!"
+        sudo cp /etc/letsencrypt/live/$MAIL_HOSTNAME/fullchain.pem certs/
+        sudo cp /etc/letsencrypt/live/$MAIL_HOSTNAME/privkey.pem certs/
+        sudo chown $USER:$USER certs/*.pem
     else
-        echo "❌ .env.example not found. Please ensure you're in the correct directory."
+        echo "❌ Failed to obtain certificates"
+        echo "   Please check:"
+        echo "   - Port 80 is accessible from internet"
+        echo "   - DNS is configured correctly"
         exit 1
     fi
 fi
 
-# Generate SECRET_KEY if not set
-if grep -q "CHANGE_ME_TO_RANDOM_STRING" .env; then
-    echo "🔐 Generating SECRET_KEY..."
-    SECRET_KEY=$(openssl rand -hex 16)
-    sed -i "s|CHANGE_ME_TO_RANDOM_STRING|${SECRET_KEY}|" .env
-    echo "✅ SECRET_KEY generated"
-fi
+# Set proper permissions
+chmod 644 certs/fullchain.pem
+chmod 600 certs/privkey.pem
 
-# Create necessary directories
-echo "📁 Creating directories..."
-mkdir -p data dkim mail webmail filter certs overrides/nginx overrides/postfix overrides/dovecot overrides/rspamd overrides/webmail mailqueue
-chmod -R 755 data dkim mail webmail filter certs overrides mailqueue
-echo "✅ Directories created"
-
-# Check DNS configuration
+echo "✓ SSL certificates configured"
 echo ""
-echo "⚠️  IMPORTANT DNS CONFIGURATION"
-echo "================================"
-echo "Before starting, make sure you have these DNS records:"
-echo ""
-echo "A     mail.privra.com     -> YOUR_SERVER_IP"
-echo "MX    privra.com          -> mail.privra.com (priority 10)"
-echo "TXT   privra.com          -> 'v=spf1 mx ~all'"
-echo "TXT   _dmarc.privra.com   -> 'v=DMARC1; p=quarantine; rua=mailto:admin@privra.com'"
-echo ""
-read -p "Have you configured DNS records? (y/n) " -n 1 -r
-echo ""
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "⏸️  Please configure DNS first, then run this script again."
-    exit 0
-fi
 
-# Ask for domain configuration
+# Start services
+echo "🚀 Starting mail server..."
 echo ""
-echo "🌐 Domain Configuration"
-echo "======================="
-read -p "Enter your main domain (default: privra.com): " DOMAIN
-DOMAIN=${DOMAIN:-privra.com}
 
-read -p "Enter your mail hostname (default: mail.privra.com): " HOSTNAME
-HOSTNAME=${HOSTNAME:-mail.$DOMAIN}
-
-echo "Updating .env file with your domain..."
-sed -i "s/DOMAIN=.*/DOMAIN=${DOMAIN}/" .env
-sed -i "s/HOSTNAMES=.*/HOSTNAMES=${HOSTNAME}/" .env
-
-echo "✅ Configuration updated"
-
-# Pull Docker images
-echo ""
-echo "📥 Pulling Docker images (this may take a few minutes)..."
-docker compose pull
+docker compose up -d
 
 echo ""
-echo "✅ Setup complete!"
+echo "⏳ Waiting for services to start..."
+sleep 15
+
+# Check service health
 echo ""
-echo "📝 Next steps:"
-echo "1. Review and customize .env file if needed"
-echo "2. Start the mail server: docker compose up -d"
-echo "3. Create your first admin user:"
-echo "   docker compose exec admin flask mailu admin admin ${DOMAIN} PASSWORD"
-echo "4. Access web interface at: https://${HOSTNAME}/admin"
-echo "5. Access webmail at: https://${HOSTNAME}/webmail"
+echo "📊 Service Status:"
+docker compose ps
+
 echo ""
-echo "🔧 Useful commands:"
-echo "   View logs:    docker compose logs -f"
-echo "   Stop server:  docker compose down"
-echo "   Restart:      docker compose restart"
+echo "=========================================="
+echo "  ✅ Privra Mail Server Setup Complete!"
+echo "=========================================="
+echo ""
+echo "📧 Admin Interface:"
+echo "   https://$MAIL_HOSTNAME/admin"
+echo "   Default login: admin / admin"
+echo "   ⚠️  CHANGE THE DEFAULT PASSWORD!"
+echo ""
+echo "📱 Email Client Settings:"
+echo "   IMAP Server: $MAIL_HOSTNAME"
+echo "   IMAP Port: 993 (SSL/TLS)"
+echo ""
+echo "   SMTP Server: $MAIL_HOSTNAME"
+echo "   SMTP Port: 587 (STARTTLS)"
+echo ""
+echo "🔧 Management Commands:"
+echo "   Add user:    docker compose exec admin python manage.py adduser user@$MAIL_DOMAIN password"
+echo "   Delete user: docker compose exec admin python manage.py deluser user@$MAIL_DOMAIN"
+echo "   List users:  docker compose exec admin python manage.py listusers"
+echo ""
+echo "📋 View logs:"
+echo "   docker compose logs -f"
+echo ""
+echo "🔄 Certificate auto-renewal:"
+echo "   Certificates will auto-renew via certbot"
 echo ""

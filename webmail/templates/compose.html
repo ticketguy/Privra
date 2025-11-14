@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Compose Email - Privra Webmail{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 style="margin-bottom: 1.5rem;">Compose New Email</h2>
+
+    <!-- Encryption Status Badge -->
+    <div id="encryptionStatus" style="padding: 10px; border-radius: 4px; margin-bottom: 1rem; display: none;">
+        <span id="encryptionIcon"></span>
+        <span id="encryptionText"></span>
+    </div>
+
+    <form method="POST" id="composeForm">
+        <div class="form-group">
+            <label for="to">To</label>
+            <input type="email" id="to" name="to" required placeholder="recipient@example.com">
+        </div>
+        <div class="form-group">
+            <label for="subject">Subject</label>
+            <input type="text" id="subject" name="subject" required placeholder="Email subject">
+        </div>
+        <div class="form-group">
+            <label for="body">Message</label>
+            <textarea id="body" name="body" placeholder="Write your message here..."></textarea>
+        </div>
+
+        <!-- Hidden fields for encryption -->
+        <input type="hidden" id="encrypted" name="encrypted" value="false">
+        <input type="hidden" id="encrypted_body" name="encrypted_body" value="">
+
+        <div style="display: flex; gap: 1rem;">
+            <button type="submit" class="btn btn-primary">Send Email</button>
+            <a href="{{ url_for('inbox') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script src="{{ url_for('static', filename='crypto.js') }}"></script>
+<script>
+let recipientPublicKey = null;
+let shouldEncrypt = false;
+
+// Check recipient when email is entered
+document.getElementById('to').addEventListener('blur', async function() {
+    const recipientEmail = this.value.trim();
+    if (!recipientEmail) return;
+
+    try {
+        const status = await PrivraCrypto.checkEncryptionStatus(recipientEmail);
+        const statusDiv = document.getElementById('encryptionStatus');
+        const iconSpan = document.getElementById('encryptionIcon');
+        const textSpan = document.getElementById('encryptionText');
+
+        if (status.shouldEncrypt) {
+            // Privra user with encryption
+            shouldEncrypt = true;
+            recipientPublicKey = status.publicKey;
+            statusDiv.style.display = 'block';
+            statusDiv.style.backgroundColor = '#d4edda';
+            statusDiv.style.border = '1px solid #c3e6cb';
+            statusDiv.style.color = '#155724';
+            iconSpan.textContent = '🔒 ';
+            textSpan.textContent = 'End-to-end encrypted (Privra user)';
+        } else if (status.info.is_privra) {
+            // Privra user without encryption
+            shouldEncrypt = false;
+            recipientPublicKey = null;
+            statusDiv.style.display = 'block';
+            statusDiv.style.backgroundColor = '#fff3cd';
+            statusDiv.style.border = '1px solid #ffc107';
+            statusDiv.style.color = '#856404';
+            iconSpan.textContent = '⚠️ ';
+            textSpan.textContent = 'Privra user (encryption not set up yet)';
+        } else {
+            // External user
+            shouldEncrypt = false;
+            recipientPublicKey = null;
+            statusDiv.style.display = 'block';
+            statusDiv.style.backgroundColor = '#f8f9fa';
+            statusDiv.style.border = '1px solid #dee2e6';
+            statusDiv.style.color = '#6c757d';
+            iconSpan.textContent = '📧 ';
+            textSpan.textContent = 'External email (not encrypted)';
+        }
+    } catch (error) {
+        console.error('Error checking encryption status:', error);
+    }
+});
+
+// Handle form submission with encryption
+document.getElementById('composeForm').addEventListener('submit', async function(e) {
+    if (shouldEncrypt && recipientPublicKey) {
+        e.preventDefault();
+
+        const body = document.getElementById('body').value;
+
+        try {
+            // Encrypt the email body
+            const encryptedBody = await PrivraCrypto.encryptText(body, recipientPublicKey);
+
+            // Set hidden fields
+            document.getElementById('encrypted').value = 'true';
+            document.getElementById('encrypted_body').value = encryptedBody;
+
+            // Clear the plaintext body
+            document.getElementById('body').value = '';
+
+            // Submit the form
+            this.submit();
+        } catch (error) {
+            alert('Encryption failed: ' + error.message);
+            console.error('Encryption error:', error);
+        }
+    }
+    // If not encrypting, form submits normally
+});
+</script>
+{% endblock %}

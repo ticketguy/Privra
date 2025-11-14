@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Consent Settings - Privra Webmail{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="margin-bottom: 1.5rem;">
+        <a href="{{ url_for('inbox') }}" class="btn btn-secondary">← Back to Inbox</a>
+    </div>
+
+    <h2 style="margin-bottom: 1.5rem;">Consent & Privacy Settings</h2>
+
+    <!-- Consent Mode Settings -->
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 2rem;">
+        <h3 style="margin-top: 0;">Privacy Mode</h3>
+        <p style="color: #666; margin-bottom: 1rem;">
+            Control who can send you emails. Enable consent mode to require approval from external senders.
+        </p>
+
+        <form method="POST" action="{{ url_for('consent_settings') }}">
+            <div style="margin-bottom: 1rem;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="require_consent" {% if require_consent %}checked{% endif %}
+                           style="margin-right: 10px; width: 18px; height: 18px;">
+                    <span style="font-weight: bold;">Require consent from external senders</span>
+                </label>
+                <p style="margin-left: 28px; color: #666; font-size: 0.9em;">
+                    External senders must request permission before their emails reach your inbox.
+                </p>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="whitelist_mode" {% if whitelist_mode %}checked{% endif %}
+                           style="margin-right: 10px; width: 18px; height: 18px;">
+                    <span style="font-weight: bold;">Whitelist-only mode</span>
+                </label>
+                <p style="margin-left: 28px; color: #666; font-size: 0.9em;">
+                    Only accept emails from whitelisted senders. All others will be rejected.
+                </p>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+        </form>
+    </div>
+
+    <!-- Whitelist Management -->
+    <div style="margin-bottom: 2rem;">
+        <h3>Whitelist</h3>
+        <p style="color: #666; margin-bottom: 1rem;">
+            Allow specific senders or domains. Use @domain.com to whitelist an entire domain.
+        </p>
+
+        <!-- Add to Whitelist Form -->
+        <form method="POST" action="{{ url_for('add_whitelist') }}" style="display: flex; gap: 10px; margin-bottom: 1rem;">
+            <input type="text" name="sender" placeholder="email@example.com or @domain.com" required
+                   style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            <input type="text" name="note" placeholder="Note (optional)"
+                   style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            <button type="submit" class="btn btn-success">Add to Whitelist</button>
+        </form>
+
+        <!-- Whitelist Table -->
+        {% if whitelist %}
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f8f9fa;">
+                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Sender</th>
+                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Note</th>
+                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Added</th>
+                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in whitelist %}
+                <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td style="padding: 10px;">
+                        {% if item[1] %}
+                            {{ item[1] }}
+                        {% elif item[2] %}
+                            @{{ item[2] }}
+                        {% endif %}
+                    </td>
+                    <td style="padding: 10px; color: #666;">{{ item[3] or '-' }}</td>
+                    <td style="padding: 10px; color: #666; font-size: 0.9em;">{{ item[4].strftime('%Y-%m-%d') if item[4] else '-' }}</td>
+                    <td style="padding: 10px;">
+                        <form method="POST" action="{{ url_for('remove_whitelist', id=item[0]) }}" style="display: inline;">
+                            <button type="submit" class="btn btn-danger" style="padding: 4px 10px; font-size: 0.9em;">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="text-align: center; color: #999; padding: 2rem; background: #f8f9fa; border-radius: 5px;">
+            No whitelisted senders yet. Add senders you trust above.
+        </p>
+        {% endif %}
+    </div>
+
+    <!-- Blacklist Management -->
+    <div style="margin-bottom: 2rem;">
+        <h3>Blacklist</h3>
+        <p style="color: #666; margin-bottom: 1rem;">
+            Block specific senders or domains. Use @domain.com to block an entire domain.
+        </p>
+
+        <!-- Add to Blacklist Form -->
+        <form method="POST" action="{{ url_for('add_blacklist') }}" style="display: flex; gap: 10px; margin-bottom: 1rem;">
+            <input type="text" name="sender" placeholder="email@example.com or @domain.com" required
+                   style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            <input type="text" name="reason" placeholder="Reason (optional)"
+                   style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            <button type="submit" class="btn btn-danger">Add to Blacklist</button>
+        </form>
+
+        <!-- Blacklist Table -->
+        {% if blacklist %}
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f8f9fa;">
+                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Sender</th>
+                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Reason</th>
+                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Added</th>
+                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in blacklist %}
+                <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td style="padding: 10px;">
+                        {% if item[1] %}
+                            {{ item[1] }}
+                        {% elif item[2] %}
+                            @{{ item[2] }}
+                        {% endif %}
+                    </td>
+                    <td style="padding: 10px; color: #666;">{{ item[3] or '-' }}</td>
+                    <td style="padding: 10px; color: #666; font-size: 0.9em;">{{ item[4].strftime('%Y-%m-%d') if item[4] else '-' }}</td>
+                    <td style="padding: 10px;">
+                        <form method="POST" action="{{ url_for('remove_blacklist', id=item[0]) }}" style="display: inline;">
+                            <button type="submit" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.9em;">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="text-align: center; color: #999; padding: 2rem; background: #f8f9fa; border-radius: 5px;">
+            No blacklisted senders yet.
+        </p>
+        {% endif %}
+    </div>
+
+    <!-- Information Box -->
+    <div style="background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; padding: 15px; border-radius: 5px;">
+        <strong>How it works:</strong>
+        <ul style="margin: 10px 0 0 20px;">
+            <li>Privra users can always email each other (internal emails bypass consent)</li>
+            <li>Whitelist takes precedence over consent requirements</li>
+            <li>Blacklist blocks senders completely</li>
+            <li>Use @domain.com syntax to whitelist/blacklist entire domains</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

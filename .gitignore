@@ -6,7 +6,6 @@ mail/
 dkim/
 certs/
 filter/
-webmail/
 mailqueue/
 overrides/nginx/
 overrides/postfix/
