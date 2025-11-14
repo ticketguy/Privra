@@ -40,10 +40,12 @@ if [ ! -f /etc/opendkim/keys/$MAIL_DOMAIN/mail.private ]; then
     echo ""
 fi
 
-# Fix OpenDKIM permissions
-chown -R root:opendkim /etc/opendkim
+# Fix OpenDKIM permissions (strict security requirements)
+# OpenDKIM requires private key to be owned by a single user with no group access
+chown -R opendkim:opendkim /etc/opendkim
 chmod -R 750 /etc/opendkim
-chmod 640 /etc/opendkim/keys/$MAIL_DOMAIN/mail.private
+chmod 600 /etc/opendkim/keys/$MAIL_DOMAIN/mail.private
+chown opendkim:opendkim /etc/opendkim/keys/$MAIL_DOMAIN/mail.private
 
 # Generate OpenDKIM configuration with actual domain
 echo "Generating OpenDKIM configuration for $MAIL_DOMAIN..."

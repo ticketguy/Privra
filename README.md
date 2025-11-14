@@ -1,106 +1,189 @@
-# Privra Mail Server
+# 🔐 Privra Mail Server
 
-A simple, reliable mail server built from scratch. **Plug and play** - no complex setup.
+**Privacy-first, encrypted email server with zero-knowledge architecture**
 
-## Quick Start
+A complete, self-hosted email solution built on Postfix, Dovecot, and modern cryptography.
+
+---
+
+## ✨ Key Features
+
+- **🔒 End-to-End Encryption**: Client-side encryption for Privra-to-Privra emails
+- **🔑 Zero-Knowledge Architecture**: Server never sees plaintext of encrypted emails
+- **🆔 PortID Ready**: Optional zero-knowledge authentication integration
+- **📧 Full Mail Server**: SMTP, IMAP, webmail, admin panel
+- **🚀 Plug and Play**: Configure via `.env`, deploy with one command
+- **🔐 Security First**: DKIM signing, SPF, DMARC, SSL/TLS
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Linux server (2GB RAM minimum, 4GB recommended)
+- Domain name with DNS access
+- Ports 25, 80, 443, 587, 993 accessible
+
+### 1. Clone Repository
 
 ```bash
 git clone https://github.com/ticketguy/Privra.git
 cd Privra
-cp .env.example .env
-nano .env  # Edit your domain and passwords
-./setup.sh
+git checkout claude/mailserver-docker-setup-011CV39qytFpBVKqnHyJe8nM
 ```
 
-**That's it!** Your mail server is ready in 5 minutes.
+### 2. Configure
 
-## Features
-
-- ✅ **Fully Working** - Send & receive emails instantly
-- ✅ **Webmail** - Built-in email client (no Gmail/Outlook needed)
-- ✅ **SMTP + IMAP** - Works with any email client
-- ✅ **SSL/TLS** - Automatic Let's Encrypt certificates
-- ✅ **Simple Admin** - Web interface to manage users
-- ✅ **PostgreSQL** - Reliable user database
-- ✅ **LMTP Delivery** - Modern, reliable mail delivery
-
-## Access
-
-- **Webmail**: http://mail.yourdomain.com:8443
-- **Admin Panel**: https://mail.yourdomain.com
-
-### External Email Clients (iPhone, Gmail, Thunderbird)
-
-**IMAP (Incoming):**
-- Server: mail.yourdomain.com
-- Port: 993
-- Security: SSL/TLS
-
-**SMTP (Outgoing):**
-- Server: mail.yourdomain.com
-- Port: 587
-- Security: STARTTLS
-
-## Architecture
-
-- **Postfix** - SMTP server (email sending/receiving)
-- **Dovecot** - IMAP server (email reading)
-- **Webmail** - Built-in email client (Flask)
-- **Admin** - User management interface (Flask)
-- **PostgreSQL** - User accounts database
-- **Redis** - Session storage
-- **Nginx** - SSL termination & reverse proxy
-
-## Management
-
-### Via Admin Panel (Easy)
-Go to https://mail.yourdomain.com and manage users with the web interface.
-
-### Via Command Line
 ```bash
-# Add user
-docker compose exec admin python manage.py adduser user@domain.com password
-
-# Delete user
-docker compose exec admin python manage.py deluser user@domain.com
-
-# Change password
-docker compose exec admin python manage.py passwd user@domain.com newpassword
-
-# View logs
-docker compose logs -f
+cp .env.example .env
+nano .env
 ```
 
-## What's Next?
+Set your domain, passwords, and hostnames.
 
-1. **Test External Email** - Send email to Gmail/Outlook to verify delivery
-2. **Configure DNS Records** - Add SPF, DKIM, DMARC for better deliverability
-3. **Backup Setup** - Backup `/var/lib/docker/volumes/privra-mail_mail-storage`
-4. **Monitor** - Check logs regularly: `docker compose logs -f`
+### 3. Get SSL Certificates
 
-## Requirements
+```bash
+sudo certbot certonly --standalone \
+  -d mail.yourdomain.com \
+  -d admin.yourdomain.com \
+  --email admin@yourdomain.com \
+  --agree-tos
 
-- Ubuntu 20.04+ server
-- Domain with A record pointing to your server
-- Ports open: 25, 80, 443, 587, 993, 8443
+# Copy to project
+sudo mkdir -p ./certs
+sudo cp /etc/letsencrypt/live/mail.yourdomain.com/fullchain.pem ./certs/
+sudo cp /etc/letsencrypt/live/mail.yourdomain.com/privkey.pem ./certs/
+sudo chmod 644 ./certs/fullchain.pem
+sudo chmod 600 ./certs/privkey.pem
+```
 
-### Important: Port 25 (SMTP)
+### 4. Deploy
 
-**Cloud providers block port 25 by default** to prevent spam. You need to request it be unblocked:
+```bash
+docker compose up -d
 
-**DigitalOcean**: Submit a support ticket requesting port 25 access (usually approved within hours)
-**AWS/Azure**: Similar process - request via support
-**Alternatives**: Vultr, Linode, Hetzner, OVH don't block port 25
+# Check logs for DKIM DNS record
+docker compose logs postfix | grep "DKIM DNS Record"
+```
 
-Until port 25 is unblocked:
-- ✅ You can **receive** emails from anyone
-- ✅ You can send emails **internally** (user@yourdomain.com to user@yourdomain.com)
-- ❌ You **cannot send** to external servers (Gmail, Outlook, etc.)
+### 5. Add DKIM DNS Record
 
-Once unblocked, your server is **fully independent** with no external dependencies.
+Copy the DKIM record from logs and add it to your DNS.
 
-## Support
+**That's it!** Your encrypted mail server is ready.
 
-Built with simplicity in mind. If it breaks, it's easy to fix.
+---
 
-No complex configurations, no hidden dependencies, no surprises.
+## 📚 Documentation
+
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Complete deployment instructions
+- **[Architecture](docs/ARCHITECTURE.md)** - System architecture and encryption design
+- **[Configuration](docs/CONFIGURATION.md)** - All configuration options explained
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[PortID Integration](docs/PORTID.md)** - Zero-knowledge authentication setup
+- **[Development History](docs/HISTORY.md)** - Project phases and milestones
+
+---
+
+## 🔐 Security
+
+- **DKIM Signing**: All outgoing emails signed automatically
+- **SPF & DMARC**: Anti-spoofing protection
+- **TLS/SSL**: All connections encrypted
+- **At-Rest Encryption**: Email storage encrypted
+- **Client-Side Encryption**: Zero-knowledge E2E encryption
+- **Hidden Admin Panel**: Obscured URL for admin interface
+
+---
+
+## 📊 What You Get
+
+### Webmail (`https://mail.yourdomain.com/`)
+- Send/receive encrypted emails
+- Automatic encryption for Privra-to-Privra emails
+- Visual encryption indicators
+- Full email management
+
+### Admin Panel (`https://admin.yourdomain.com/warofbest/`)
+- Create/manage email accounts
+- Automatic encryption key generation
+- User management
+- System monitoring
+
+### Mail Server
+- SMTP (port 25, 587)
+- IMAP (port 993)
+- Works with all email clients (iPhone, Thunderbird, etc.)
+
+---
+
+## 🎯 Email Encryption
+
+### Privra → Privra
+**🔒 End-to-End Encrypted**
+- Encrypted in sender's browser
+- Server never sees plaintext
+- Decrypted in recipient's browser
+
+### Privra → External (Gmail, etc.)
+**📧 Standard Email**
+- Compatible with all email providers
+- Signed with DKIM
+- Works like normal email
+
+### External → Privra
+**📨 Received Normally**
+- Fully compatible with existing email
+- Can be encrypted on receipt (optional gateway encryption)
+
+---
+
+## 🛠️ Tech Stack
+
+- **Postfix** - SMTP server
+- **Dovecot** - IMAP server
+- **PostgreSQL** - User database
+- **Redis** - Session storage
+- **Nginx** - Reverse proxy & SSL termination
+- **OpenDKIM** - Email signing
+- **Python/Flask** - Admin & webmail interfaces
+- **WebCrypto API** - Client-side encryption
+
+---
+
+## 📈 Mail-Tester Score
+
+After deployment with proper DNS configuration:
+
+- ✅ **DKIM**: Signed
+- ✅ **SPF**: Pass
+- ✅ **DMARC**: Pass
+- **Score**: **8-10/10**
+
+---
+
+## 🤝 Contributing
+
+This is part of the **Privra** privacy-focused ecosystem built by **Harboria Labs**.
+
+- **Founder**: ticketguy
+- **Related Projects**: [PortID](https://github.com/Harboria-Labs/portid)
+
+---
+
+## 📄 License
+
+Open-source and customizable. Built with privacy in mind, owned by you.
+
+---
+
+## 🔗 Quick Links
+
+- [Full Documentation](docs/)
+- [Deployment Guide](docs/DEPLOYMENT.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [GitHub Issues](https://github.com/ticketguy/Privra/issues)
+
+**Built with privacy, owned by you. 🔐**
