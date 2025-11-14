@@ -39,6 +39,14 @@ A complete, self-hosted email solution built on Postfix, Dovecot, and modern cry
 - **📊 Admin Dashboard**: Complete user and consent management
 - **🔄 Background Services**: Automatic categorization and encryption
 
+### User Profiles & Verification
+- **👤 User Profiles**: Display name, bio, avatar (like Gmail)
+- **🏢 Organization Profiles**: Company branding and verification
+- **🖼️ NFT Avatars**: Solana NFT as profile picture
+- **✅ Domain Verification**: DNS TXT record verification
+- **⭐ Reputation System**: 5 levels with automatic scoring
+- **🎨 Modern UI**: Anime-inspired, mobile-first design
+
 ---
 
 ## 🚀 Quick Start
@@ -102,12 +110,12 @@ Copy the DKIM record from logs and add it to your DNS.
 
 ## 📚 Documentation
 
+- **[FEATURES.md](FEATURES.md)** - Complete feature documentation & implementation guide
 - **[Deployment Guide](docs/DEPLOYMENT.md)** - Complete deployment instructions
 - **[Architecture](docs/ARCHITECTURE.md)** - System architecture and encryption design
 - **[Configuration](docs/CONFIGURATION.md)** - All configuration options explained
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 - **[PortID Integration](docs/PORTID.md)** - Zero-knowledge authentication setup
-- **[Development History](docs/HISTORY.md)** - Project phases and milestones
 
 ---
 
