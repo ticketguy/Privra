@@ -7,11 +7,12 @@ import email
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import decode_header
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from datetime import datetime, timedelta
 import os
 import psycopg2
 from portid_service import portid_service
+from crypto_utils import decrypt_private_key_with_recovery_key
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -139,6 +140,43 @@ def login():
         mail = connect_imap(email_addr, password)
         if mail:
             mail.logout()
+
+            # Load user's encryption keys from database
+            try:
+                conn = get_db()
+                cur = conn.cursor()
+                cur.execute(
+                    """SELECT recovery_key, email_private_key_encrypted
+                       FROM users WHERE email = %s AND active = TRUE""",
+                    (email_addr,)
+                )
+                key_data = cur.fetchone()
+                cur.close()
+                conn.close()
+
+                # If user has encryption keys, decrypt private key and store in session
+                if key_data and key_data[0] and key_data[1]:
+                    recovery_key = key_data[0]
+                    encrypted_private_key = key_data[1]
+
+                    # Decrypt private key with recovery key
+                    private_key_pem = decrypt_private_key_with_recovery_key(
+                        encrypted_private_key,
+                        recovery_key
+                    )
+
+                    if private_key_pem:
+                        # Store decrypted private key in session (encrypted via HTTPS)
+                        session['private_key'] = private_key_pem
+                        session['has_encryption'] = True
+                    else:
+                        session['has_encryption'] = False
+                else:
+                    session['has_encryption'] = False
+            except Exception as e:
+                print(f"Error loading encryption keys: {e}")
+                session['has_encryption'] = False
+
             session.permanent = True
             session['email'] = email_addr
             session['password'] = password
@@ -149,6 +187,65 @@ def login():
             flash('Invalid email or password', 'error')
 
     return render_template('login.html', portid_enabled=portid_service.is_enabled())
+
+@app.route('/api/private-key')
+def get_private_key():
+    """API endpoint to get user's private key for client-side encryption"""
+    if 'email' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    if not session.get('has_encryption', False):
+        return jsonify({'error': 'Encryption not enabled for this user'}), 404
+
+    private_key = session.get('private_key')
+    if not private_key:
+        return jsonify({'error': 'Private key not available'}), 404
+
+    return jsonify({
+        'private_key': private_key,
+        'has_encryption': True
+    })
+
+@app.route('/api/pubkey/<email>')
+def get_public_key(email):
+    """Public key lookup API endpoint"""
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT email, email_public_key FROM users WHERE email = %s AND active = TRUE",
+            (email,)
+        )
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if result and result[1]:
+            # User exists and has a public key
+            return jsonify({
+                "email": result[0],
+                "public_key": result[1],
+                "is_privra": True,
+                "encrypted": True
+            }), 200
+        elif result:
+            # User exists but no encryption keys yet
+            return jsonify({
+                "email": result[0],
+                "is_privra": True,
+                "encrypted": False,
+                "message": "User exists but hasn't set up encryption yet"
+            }), 200
+        else:
+            # User doesn't exist - external email
+            return jsonify({
+                "email": email,
+                "is_privra": False,
+                "encrypted": False
+            }), 404
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/logout')
 def logout():
@@ -233,6 +330,9 @@ def view_email(email_id):
         date_str = msg['Date']
         body = get_email_body(msg)
 
+        # Check if email is encrypted
+        is_encrypted = msg.get('X-Privra-Encrypted', '').lower() == 'true'
+
         try:
             date = email.utils.parsedate_to_datetime(date_str)
             date_formatted = date.strftime('%Y-%m-%d %H:%M:%S')
@@ -246,7 +346,8 @@ def view_email(email_id):
                              from_addr=from_addr,
                              to_addr=to_addr,
                              date=date_formatted,
-                             body=body)
+                             body=body,
+                             is_encrypted=is_encrypted)
 
     except Exception as e:
         print(f"View email error: {e}")
@@ -264,10 +365,15 @@ def compose():
         to_addr = request.form.get('to')
         subject = request.form.get('subject')
         body = request.form.get('body')
+        is_encrypted = request.form.get('encrypted', 'false') == 'true'
+        encrypted_body = request.form.get('encrypted_body', '')
 
         if not to_addr or not subject:
             flash('Please fill in To and Subject fields', 'error')
             return render_template('compose.html')
+
+        # Use encrypted body if available, otherwise use plaintext
+        email_body = encrypted_body if is_encrypted else body
 
         # Connect to SMTP
         smtp = connect_smtp(session['email'], session['password'])
@@ -281,13 +387,21 @@ def compose():
             msg['From'] = session['email']
             msg['To'] = to_addr
             msg['Subject'] = subject
-            msg.attach(MIMEText(body, 'plain'))
+
+            # Add encryption header if encrypted
+            if is_encrypted:
+                msg['X-Privra-Encrypted'] = 'true'
+
+            msg.attach(MIMEText(email_body, 'plain'))
 
             # Send email
             smtp.send_message(msg)
             smtp.quit()
 
-            flash('Email sent successfully!', 'success')
+            if is_encrypted:
+                flash('Encrypted email sent successfully! 🔒', 'success')
+            else:
+                flash('Email sent successfully!', 'success')
             return redirect(url_for('inbox'))
 
         except Exception as e:
