@@ -31,8 +31,6 @@ if [ ! -f /etc/opendkim/keys/$MAIL_DOMAIN/mail.private ]; then
     echo "Generating DKIM keys for $MAIL_DOMAIN..."
     mkdir -p /etc/opendkim/keys/$MAIL_DOMAIN
     opendkim-genkey -b 2048 -d $MAIL_DOMAIN -D /etc/opendkim/keys/$MAIL_DOMAIN -s mail -v
-    chown -R opendkim:opendkim /etc/opendkim/keys
-    chmod 600 /etc/opendkim/keys/$MAIL_DOMAIN/mail.private
     echo ""
     echo "========================================="
     echo "DKIM DNS Record (add this to your DNS):"
@@ -41,6 +39,11 @@ if [ ! -f /etc/opendkim/keys/$MAIL_DOMAIN/mail.private ]; then
     echo "========================================="
     echo ""
 fi
+
+# Fix OpenDKIM permissions
+chown -R root:opendkim /etc/opendkim
+chmod -R 750 /etc/opendkim
+chmod 640 /etc/opendkim/keys/$MAIL_DOMAIN/mail.private
 
 echo "Postfix configured. Starting services..."
 
