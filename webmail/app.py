@@ -13,6 +13,7 @@ import os
 import psycopg2
 from portid_service import portid_service
 from crypto_utils import decrypt_private_key_with_recovery_key
+from email_categorizer import EmailCategorizer
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -23,6 +24,9 @@ IMAP_HOST = os.getenv('IMAP_HOST', 'dovecot')
 IMAP_PORT = int(os.getenv('IMAP_PORT', '993'))
 SMTP_HOST = os.getenv('SMTP_HOST', 'postfix')
 SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
+
+# Email categorizer
+categorizer = EmailCategorizer()
 
 # Database connection
 def get_db():
@@ -284,6 +288,13 @@ def inbox():
                 from_addr = decode_mime_words(msg['From']) or 'Unknown'
                 date_str = msg['Date']
 
+                # Get body for categorization (limited preview to save resources)
+                body_preview = get_email_body(msg)[:500]  # First 500 chars
+
+                # Categorize email
+                category = categorizer.categorize(subject, from_addr, body_preview)
+                category_name = categorizer.get_category_name(category)
+
                 # Parse date
                 try:
                     date = email.utils.parsedate_to_datetime(date_str)
@@ -294,13 +305,23 @@ def inbox():
                     'id': email_id.decode(),
                     'subject': subject,
                     'from': from_addr,
-                    'date': date.strftime('%Y-%m-%d %H:%M')
+                    'date': date.strftime('%Y-%m-%d %H:%M'),
+                    'category': category,
+                    'category_name': category_name
                 })
             except Exception as e:
                 print(f"Error parsing email {email_id}: {e}")
 
+        # Filter by category if requested
+        filter_category = request.args.get('category', 'all')
+        if filter_category != 'all':
+            emails = [e for e in emails if e['category'] == filter_category]
+
         mail.logout()
-        return render_template('inbox.html', emails=emails)
+        return render_template('inbox.html',
+                             emails=emails,
+                             categories=categorizer.get_all_categories(),
+                             current_category=filter_category)
 
     except Exception as e:
         print(f"Inbox error: {e}")
@@ -411,6 +432,224 @@ def compose():
             return render_template('compose.html')
 
     return render_template('compose.html')
+
+@app.route('/settings/consent', methods=['GET', 'POST'])
+def consent_settings():
+    """Manage consent and whitelist settings"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    user_email = session['email']
+
+    if request.method == 'POST':
+        # Update consent settings
+        require_consent = request.form.get('require_consent') == 'on'
+        whitelist_mode = request.form.get('whitelist_mode') == 'on'
+
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+
+            # Upsert consent settings
+            cur.execute("""
+                INSERT INTO consent_settings (user_email, require_consent, whitelist_mode)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (user_email)
+                DO UPDATE SET
+                    require_consent = EXCLUDED.require_consent,
+                    whitelist_mode = EXCLUDED.whitelist_mode,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (user_email, require_consent, whitelist_mode))
+
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            flash('Consent settings updated successfully!', 'success')
+        except Exception as e:
+            print(f"Error updating consent settings: {e}")
+            flash('Error updating settings', 'error')
+
+        return redirect(url_for('consent_settings'))
+
+    # Get current settings
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Get consent settings
+        cur.execute("""
+            SELECT require_consent, whitelist_mode
+            FROM consent_settings
+            WHERE user_email = %s
+        """, (user_email,))
+        settings = cur.fetchone()
+
+        # Get whitelist
+        cur.execute("""
+            SELECT id, sender_email, sender_domain, note, created_at
+            FROM sender_whitelist
+            WHERE recipient_email = %s
+            ORDER BY created_at DESC
+        """, (user_email,))
+        whitelist = cur.fetchall()
+
+        # Get blacklist
+        cur.execute("""
+            SELECT id, sender_email, sender_domain, reason, created_at
+            FROM sender_blacklist
+            WHERE recipient_email = %s
+            ORDER BY created_at DESC
+        """, (user_email,))
+        blacklist = cur.fetchall()
+
+        cur.close()
+        conn.close()
+
+        return render_template('consent_settings.html',
+                             require_consent=settings[0] if settings else False,
+                             whitelist_mode=settings[1] if settings else False,
+                             whitelist=whitelist,
+                             blacklist=blacklist)
+
+    except Exception as e:
+        print(f"Error loading consent settings: {e}")
+        flash('Error loading settings', 'error')
+        return redirect(url_for('inbox'))
+
+@app.route('/settings/whitelist/add', methods=['POST'])
+def add_whitelist():
+    """Add sender to whitelist"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    sender = request.form.get('sender', '').strip()
+    note = request.form.get('note', '').strip()
+
+    if not sender:
+        flash('Sender email is required', 'error')
+        return redirect(url_for('consent_settings'))
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Determine if it's a domain or email
+        if sender.startswith('@'):
+            # Domain whitelist
+            cur.execute("""
+                INSERT INTO sender_whitelist (recipient_email, sender_domain, note)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (recipient_email, sender_email) DO NOTHING
+            """, (session['email'], sender[1:], note))
+        else:
+            # Email whitelist
+            cur.execute("""
+                INSERT INTO sender_whitelist (recipient_email, sender_email, note)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (recipient_email, sender_email) DO NOTHING
+            """, (session['email'], sender, note))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash(f'Added {sender} to whitelist', 'success')
+    except Exception as e:
+        print(f"Error adding to whitelist: {e}")
+        flash('Error adding to whitelist', 'error')
+
+    return redirect(url_for('consent_settings'))
+
+@app.route('/settings/whitelist/remove/<int:id>', methods=['POST'])
+def remove_whitelist(id):
+    """Remove sender from whitelist"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            DELETE FROM sender_whitelist
+            WHERE id = %s AND recipient_email = %s
+        """, (id, session['email']))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash('Removed from whitelist', 'success')
+    except Exception as e:
+        print(f"Error removing from whitelist: {e}")
+        flash('Error removing from whitelist', 'error')
+
+    return redirect(url_for('consent_settings'))
+
+@app.route('/settings/blacklist/add', methods=['POST'])
+def add_blacklist():
+    """Add sender to blacklist"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    sender = request.form.get('sender', '').strip()
+    reason = request.form.get('reason', '').strip()
+
+    if not sender:
+        flash('Sender email is required', 'error')
+        return redirect(url_for('consent_settings'))
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Determine if it's a domain or email
+        if sender.startswith('@'):
+            # Domain blacklist
+            cur.execute("""
+                INSERT INTO sender_blacklist (recipient_email, sender_domain, reason)
+                VALUES (%s, %s, %s)
+            """, (session['email'], sender[1:], reason))
+        else:
+            # Email blacklist
+            cur.execute("""
+                INSERT INTO sender_blacklist (recipient_email, sender_email, reason)
+                VALUES (%s, %s, %s)
+            """, (session['email'], sender, reason))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash(f'Added {sender} to blacklist', 'success')
+    except Exception as e:
+        print(f"Error adding to blacklist: {e}")
+        flash('Error adding to blacklist', 'error')
+
+    return redirect(url_for('consent_settings'))
+
+@app.route('/settings/blacklist/remove/<int:id>', methods=['POST'])
+def remove_blacklist(id):
+    """Remove sender from blacklist"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            DELETE FROM sender_blacklist
+            WHERE id = %s AND recipient_email = %s
+        """, (id, session['email']))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash('Removed from blacklist', 'success')
+    except Exception as e:
+        print(f"Error removing from blacklist: {e}")
+        flash('Error removing from blacklist', 'error')
+
+    return redirect(url_for('consent_settings'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)

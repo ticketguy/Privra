@@ -34,7 +34,7 @@ broken_sasl_auth_clients = yes
 
 # Relay and client restrictions
 smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination
-smtpd_recipient_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination
+smtpd_recipient_restrictions = permit_mynetworks, permit_sasl_authenticated, check_policy_service unix:private/consent, reject_unauth_destination
 smtpd_client_restrictions = permit_mynetworks, permit_sasl_authenticated
 
 # Message size limit (50MB)

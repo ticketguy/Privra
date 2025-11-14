@@ -111,6 +111,10 @@
             background: #95a5a6;
             color: white;
         }
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
         .email-list {
             list-style: none;
         }
@@ -173,6 +177,7 @@
                 <span>{{ session.email }}</span>
                 <a href="{{ url_for('inbox') }}">Inbox</a>
                 <a href="{{ url_for('compose') }}">Compose</a>
+                <a href="{{ url_for('consent_settings') }}">Settings</a>
                 <a href="{{ url_for('logout') }}">Logout</a>
             {% endif %}
         </nav>

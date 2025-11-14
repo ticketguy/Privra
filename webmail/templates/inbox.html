@@ -9,12 +9,68 @@
         <a href="{{ url_for('compose') }}" class="btn btn-success">Compose New</a>
     </div>
 
+    <!-- Category Filters -->
+    <div style="margin-bottom: 1.5rem; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <span style="font-weight: bold; margin-right: 5px;">Categories:</span>
+            <a href="{{ url_for('inbox', category='all') }}"
+               class="category-filter {% if current_category == 'all' %}active{% endif %}">
+                All
+            </a>
+            {% for key, name in categories.items() %}
+            <a href="{{ url_for('inbox', category=key) }}"
+               class="category-filter {% if current_category == key %}active{% endif %}">
+                {{ name }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <style>
+    .category-filter {
+        padding: 5px 12px;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 15px;
+        text-decoration: none;
+        color: #495057;
+        font-size: 0.9em;
+        transition: all 0.2s;
+    }
+    .category-filter:hover {
+        background: #e9ecef;
+        border-color: #007bff;
+    }
+    .category-filter.active {
+        background: #007bff;
+        color: white;
+        border-color: #007bff;
+    }
+    .category-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 0.75em;
+        font-weight: bold;
+        margin-left: 8px;
+    }
+    .category-priority { background: #dc3545; color: white; }
+    .category-social { background: #17a2b8; color: white; }
+    .category-updates { background: #6c757d; color: white; }
+    .category-promotions { background: #ffc107; color: #212529; }
+    .category-spam { background: #e83e8c; color: white; }
+    .category-inbox { background: #e9ecef; color: #495057; }
+    </style>
+
     {% if emails %}
         <ul class="email-list">
             {% for email in emails %}
                 <li class="email-item">
                     <a href="{{ url_for('view_email', email_id=email.id) }}">
-                        <div class="email-subject">{{ email.subject }}</div>
+                        <div class="email-subject">
+                            {{ email.subject }}
+                            <span class="category-badge category-{{ email.category }}">{{ email.category_name }}</span>
+                        </div>
                         <div class="email-from">From: {{ email.from }}</div>
                     </a>
                     <div class="email-date">{{ email.date }}</div>
@@ -23,7 +79,11 @@
         </ul>
     {% else %}
         <p style="text-align: center; color: #999; padding: 3rem;">
-            No emails in inbox. Start by composing a new email!
+            {% if current_category != 'all' %}
+                No emails in {{ categories[current_category] }} category.
+            {% else %}
+                No emails in inbox. Start by composing a new email!
+            {% endif %}
         </p>
     {% endif %}
 </div>
