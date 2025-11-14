@@ -90,6 +90,7 @@ services:
       - REDIS_PORT=6379
       - PORTID_APP_ID=${PORTID_APP_ID:-privra-mail-v1}
       - PORTID_API_URL=${PORTID_API_URL:-http://localhost:5001}
+      - APPLICATION_ROOT=/warofbest
     volumes:
       - ./admin:/app
     networks:
@@ -104,8 +105,6 @@ services:
   webmail:
     build: ./webmail
     restart: always
-    ports:
-      - "8443:5001"
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - IMAP_HOST=dovecot
@@ -118,6 +117,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - PORTID_APP_ID=${PORTID_APP_ID:-privra-mail-v1}
       - PORTID_API_URL=${PORTID_API_URL:-http://localhost:5001}
+      - APPLICATION_ROOT=/mail
     networks:
       - mailnet
     depends_on:

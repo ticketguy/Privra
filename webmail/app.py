@@ -22,10 +22,16 @@ from crypto_utils import (
 from Crypto.Random import get_random_bytes
 import bcrypt
 from email_categorizer import EmailCategorizer
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+app.config['APPLICATION_ROOT'] = os.getenv('APPLICATION_ROOT', '/')
+app.config['PREFERRED_URL_SCHEME'] = 'https'
+
+# Handle reverse proxy headers
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # Mail server settings
 IMAP_HOST = os.getenv('IMAP_HOST', 'dovecot')

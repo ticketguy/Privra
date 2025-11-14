@@ -13,9 +13,15 @@ from crypto_utils import (
     serialize_private_key,
     encrypt_private_key_with_recovery_key
 )
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'change-this-secret-key')
+app.config['APPLICATION_ROOT'] = os.getenv('APPLICATION_ROOT', '/')
+app.config['PREFERRED_URL_SCHEME'] = 'https'
+
+# Handle reverse proxy headers
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # Database connection
 def get_db():
