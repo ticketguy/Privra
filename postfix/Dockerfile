@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Postfix, PostgreSQL client, and Python
+# Install Postfix, PostgreSQL client, Python, and rsyslog
 RUN apt-get update && apt-get install -y \
     postfix \
     postfix-pgsql \
@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     supervisor \
     python3 \
     python3-pip \
+    rsyslog \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies for content filter
