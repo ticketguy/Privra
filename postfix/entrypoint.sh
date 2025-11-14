@@ -83,6 +83,10 @@ SignatureAlgorithm rsa-sha256
 Socket inet:8891@localhost
 EOF
 
+# Set ownership of config file to opendkim user
+chown opendkim:opendkim /etc/opendkim.conf
+chmod 644 /etc/opendkim.conf
+
 echo "Postfix configured. Starting services..."
 
 # Start services using supervisord
