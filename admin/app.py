@@ -253,6 +253,146 @@ def passwd(email):
 
     return render_template_string(PASSWD_TEMPLATE, email=email)
 
+@app.route('/consent/<email>', methods=['GET', 'POST'])
+@login_required
+def consent_settings(email):
+    """Manage consent settings for a user"""
+    if request.method == 'POST':
+        require_consent = request.form.get('require_consent') == 'on'
+        require_payment = request.form.get('require_payment') == 'on'
+        whitelist_mode = request.form.get('whitelist_mode') == 'on'
+        payment_amount = int(request.form.get('payment_amount_sats', 1000))
+
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+
+            # Upsert consent settings
+            cur.execute("""
+                INSERT INTO consent_settings
+                (user_email, require_consent, require_payment, whitelist_mode, payment_amount_sats, updated_at)
+                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_email)
+                DO UPDATE SET
+                    require_consent = %s,
+                    require_payment = %s,
+                    whitelist_mode = %s,
+                    payment_amount_sats = %s,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (email, require_consent, require_payment, whitelist_mode, payment_amount,
+                  require_consent, require_payment, whitelist_mode, payment_amount))
+
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            flash(f'Consent settings updated for {email}!', 'success')
+            return redirect(url_for('consent_settings', email=email))
+        except Exception as e:
+            flash(f'Error: {str(e)}', 'error')
+
+    # Get current settings
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Get user
+        cur.execute("SELECT email, active FROM users WHERE email = %s", (email,))
+        user = cur.fetchone()
+
+        if not user:
+            flash(f'User {email} not found!', 'error')
+            return redirect(url_for('index'))
+
+        # Get consent settings
+        cur.execute("""
+            SELECT require_consent, require_payment, whitelist_mode, payment_amount_sats
+            FROM consent_settings WHERE user_email = %s
+        """, (email,))
+        settings = cur.fetchone()
+
+        # Get whitelist
+        cur.execute("""
+            SELECT sender_email, sender_domain, added_at
+            FROM sender_whitelist WHERE recipient_email = %s
+            ORDER BY added_at DESC
+        """, (email,))
+        whitelist = cur.fetchall()
+
+        # Get blacklist
+        cur.execute("""
+            SELECT sender_email, sender_domain, added_at
+            FROM sender_blacklist WHERE recipient_email = %s
+            ORDER BY added_at DESC
+        """, (email,))
+        blacklist = cur.fetchall()
+
+        cur.close()
+        conn.close()
+
+        return render_template_string(CONSENT_TEMPLATE,
+                                     email=email,
+                                     settings=settings,
+                                     whitelist=whitelist,
+                                     blacklist=blacklist)
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/consent/<email>/whitelist/add', methods=['POST'])
+@login_required
+def add_whitelist(email):
+    """Add sender to whitelist"""
+    sender_email = request.form.get('sender_email', '').strip()
+    sender_domain = request.form.get('sender_domain', '').strip()
+
+    if not sender_email and not sender_domain:
+        flash('Please provide either an email or domain', 'error')
+        return redirect(url_for('consent_settings', email=email))
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO sender_whitelist (recipient_email, sender_email, sender_domain)
+            VALUES (%s, %s, %s)
+        """, (email, sender_email if sender_email else None, sender_domain if sender_domain else None))
+        conn.commit()
+        cur.close()
+        conn.close()
+        flash('Added to whitelist!', 'success')
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'error')
+
+    return redirect(url_for('consent_settings', email=email))
+
+@app.route('/consent/<email>/blacklist/add', methods=['POST'])
+@login_required
+def add_blacklist(email):
+    """Add sender to blacklist"""
+    sender_email = request.form.get('sender_email', '').strip()
+    sender_domain = request.form.get('sender_domain', '').strip()
+
+    if not sender_email and not sender_domain:
+        flash('Please provide either an email or domain', 'error')
+        return redirect(url_for('consent_settings', email=email))
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO sender_blacklist (recipient_email, sender_email, sender_domain)
+            VALUES (%s, %s, %s)
+        """, (email, sender_email if sender_email else None, sender_domain if sender_domain else None))
+        conn.commit()
+        cur.close()
+        conn.close()
+        flash('Added to blacklist!', 'success')
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'error')
+
+    return redirect(url_for('consent_settings', email=email))
+
 # HTML Templates
 LOGIN_TEMPLATE = '''
 <!DOCTYPE html>
@@ -361,6 +501,7 @@ INDEX_TEMPLATE = '''
                     <td>{{ user[2].strftime('%Y-%m-%d %H:%M') }}</td>
                     <td>
                         <a href="{{ url_for('passwd', email=user[0]) }}" class="btn btn-primary">Change Password</a>
+                        <a href="{{ url_for('consent_settings', email=user[0]) }}" class="btn btn-primary">Consent Settings</a>
                         <form method="POST" action="{{ url_for('deluser', email=user[0]) }}" style="display: inline;">
                             <button type="submit" class="btn btn-danger" onclick="return confirm('Delete {{ user[0] }}?')">Delete</button>
                         </form>
@@ -509,6 +650,163 @@ RECOVERY_KEY_TEMPLATE = '''
         });
     }
     </script>
+</body>
+</html>
+'''
+
+CONSENT_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Consent Settings - {{ email }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; }
+        .header { background: white; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        h2 { margin-bottom: 20px; color: #333; }
+        h3 { margin: 25px 0 15px 0; color: #555; font-size: 18px; }
+        .back { display: inline-block; margin-bottom: 20px; color: #007bff; text-decoration: none; }
+        input[type="checkbox"] { margin-right: 8px; width: auto; }
+        input[type="number"], input[type="text"] { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px; }
+        label { display: block; margin: 12px 0; font-size: 14px; }
+        button { padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        button:hover { background: #0056b3; }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .flash { padding: 12px; margin: 15px 0; border-radius: 4px; }
+        .flash.error { background: #fee; color: #c33; border: 1px solid #fcc; }
+        .flash.success { background: #efe; color: #3c3; border: 1px solid #cfc; }
+        .section { background: #f8f9fa; padding: 20px; border-radius: 6px; margin: 20px 0; }
+        .info-box { background: #e7f3ff; border-left: 4px solid #007bff; padding: 12px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📧 Privra Mail Admin</h1>
+    </div>
+    <div class="container">
+        <a href="{{ url_for('index') }}" class="back">← Back to Users</a>
+        <h2>Consent & Pay-to-Send Settings for {{ email }}</h2>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="info-box">
+            <strong>Phase 5: Pay-to-Send Economic Layer</strong><br>
+            Control who can send emails to this user. Configure consent requirements, payment settings, and whitelist/blacklist.
+        </div>
+
+        <form method="POST" class="section">
+            <h3>Consent Settings</h3>
+
+            <label>
+                <input type="checkbox" name="require_consent" {% if settings and settings[0] %}checked{% endif %}>
+                Require consent from unknown senders
+            </label>
+
+            <label>
+                <input type="checkbox" name="require_payment" {% if settings and settings[1] %}checked{% endif %}>
+                Require payment for consent
+            </label>
+
+            <label>
+                <input type="checkbox" name="whitelist_mode" {% if settings and settings[2] %}checked{% endif %}>
+                Whitelist mode (only allow whitelisted senders)
+            </label>
+
+            <label>
+                Payment amount (satoshis):
+                <input type="number" name="payment_amount_sats" value="{{ settings[3] if settings else 1000 }}" min="1">
+            </label>
+
+            <button type="submit">Save Settings</button>
+        </form>
+
+        <h3>Whitelist (Allowed Senders)</h3>
+        <div class="section">
+            <form method="POST" action="{{ url_for('add_whitelist', email=email) }}" style="margin-bottom: 20px;">
+                <label>
+                    Sender Email:
+                    <input type="text" name="sender_email" placeholder="sender@example.com">
+                </label>
+                <label>
+                    OR Sender Domain:
+                    <input type="text" name="sender_domain" placeholder="example.com">
+                </label>
+                <button type="submit" class="btn-success">Add to Whitelist</button>
+            </form>
+
+            {% if whitelist %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Domain</th>
+                        <th>Added</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in whitelist %}
+                    <tr>
+                        <td>{{ entry[0] or '-' }}</td>
+                        <td>{{ entry[1] or '-' }}</td>
+                        <td>{{ entry[2].strftime('%Y-%m-%d %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: #666; font-style: italic;">No entries in whitelist</p>
+            {% endif %}
+        </div>
+
+        <h3>Blacklist (Blocked Senders)</h3>
+        <div class="section">
+            <form method="POST" action="{{ url_for('add_blacklist', email=email) }}" style="margin-bottom: 20px;">
+                <label>
+                    Sender Email:
+                    <input type="text" name="sender_email" placeholder="spammer@example.com">
+                </label>
+                <label>
+                    OR Sender Domain:
+                    <input type="text" name="sender_domain" placeholder="spam.com">
+                </label>
+                <button type="submit" class="btn-success">Add to Blacklist</button>
+            </form>
+
+            {% if blacklist %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Domain</th>
+                        <th>Added</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in blacklist %}
+                    <tr>
+                        <td>{{ entry[0] or '-' }}</td>
+                        <td>{{ entry[1] or '-' }}</td>
+                        <td>{{ entry[2].strftime('%Y-%m-%d %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: #666; font-style: italic;">No entries in blacklist</p>
+            {% endif %}
+        </div>
+    </div>
 </body>
 </html>
 '''

@@ -104,6 +104,94 @@ def init_database():
         (domain,)
     )
 
+    # Create consent settings table (Phase 5)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS consent_settings (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) UNIQUE NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            require_consent BOOLEAN DEFAULT FALSE,
+            require_payment BOOLEAN DEFAULT FALSE,
+            whitelist_mode BOOLEAN DEFAULT FALSE,
+            payment_amount_sats INTEGER DEFAULT 1000,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create sender whitelist table (Phase 5)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS sender_whitelist (
+            id SERIAL PRIMARY KEY,
+            recipient_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            sender_email VARCHAR(255),
+            sender_domain VARCHAR(255),
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(recipient_email, sender_email),
+            UNIQUE(recipient_email, sender_domain)
+        )
+    """)
+
+    # Create sender blacklist table (Phase 5)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS sender_blacklist (
+            id SERIAL PRIMARY KEY,
+            recipient_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            sender_email VARCHAR(255),
+            sender_domain VARCHAR(255),
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(recipient_email, sender_email),
+            UNIQUE(recipient_email, sender_domain)
+        )
+    """)
+
+    # Create consent requests table (Phase 5)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS consent_requests (
+            id SERIAL PRIMARY KEY,
+            recipient_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            sender_email VARCHAR(255) NOT NULL,
+            token VARCHAR(255) UNIQUE NOT NULL,
+            email_subject TEXT,
+            status VARCHAR(20) DEFAULT 'pending',
+            payment_received BOOLEAN DEFAULT FALSE,
+            payment_txid VARCHAR(255),
+            expires_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            approved_at TIMESTAMP,
+            rejected_at TIMESTAMP
+        )
+    """)
+
+    # Create email categories table (Phase 4 - AI Intelligence)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS email_categories (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            email_id VARCHAR(255) NOT NULL,
+            category VARCHAR(50) NOT NULL,
+            confidence FLOAT,
+            ai_summary TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_email, email_id)
+        )
+    """)
+
+    # Create payment transactions table (Phase 5)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS payment_transactions (
+            id SERIAL PRIMARY KEY,
+            consent_request_id INTEGER REFERENCES consent_requests(id) ON DELETE CASCADE,
+            sender_email VARCHAR(255) NOT NULL,
+            recipient_email VARCHAR(255) NOT NULL,
+            amount_sats INTEGER NOT NULL,
+            payment_method VARCHAR(50),
+            txid VARCHAR(255) UNIQUE,
+            status VARCHAR(20) DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            confirmed_at TIMESTAMP
+        )
+    """)
+
     # Create default admin user (admin/admin) - CHANGE THIS!
     import bcrypt
     default_password = bcrypt.hashpw(b'admin', bcrypt.gensalt()).decode('utf-8')

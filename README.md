@@ -8,12 +8,33 @@ A complete, self-hosted email solution built on Postfix, Dovecot, and modern cry
 
 ## ✨ Key Features
 
-- **🔒 End-to-End Encryption**: Client-side encryption for Privra-to-Privra emails
-- **🔑 Zero-Knowledge Architecture**: Server never sees plaintext of encrypted emails
-- **🆔 PortID Ready**: Optional zero-knowledge authentication integration
+### Core Mail Server
 - **📧 Full Mail Server**: SMTP, IMAP, webmail, admin panel
 - **🚀 Plug and Play**: Configure via `.env`, deploy with one command
 - **🔐 Security First**: DKIM signing, SPF, DMARC, SSL/TLS
+
+### Phase 3.3: Gateway Encryption
+- **🔒 End-to-End Encryption**: Client-side encryption for Privra-to-Privra emails
+- **🛡️ Gateway Encryption**: Automatic encryption of incoming external emails
+- **🔓 Smart Decryption**: Automatic decryption of outgoing emails to external recipients
+- **🔑 Zero-Knowledge Architecture**: Server never sees plaintext of encrypted emails
+
+### Phase 4: AI Intelligence Layer
+- **🤖 Automatic Categorization**: AI-powered email classification
+- **📁 Smart Folders**: Priority, Social, Updates, Promotions, Spam
+- **⚡ Real-time Processing**: Background service categorizes emails as they arrive
+- **🎯 Rule-Based AI**: Keyword and pattern matching (LLM integration ready)
+
+### Phase 5: Pay-to-Send Economic Layer
+- **💰 Consent System**: Require consent from unknown senders
+- **⚡ Lightning Payments**: Micropayments to reach your inbox (Bitcoin satoshis)
+- **✅ Whitelist/Blacklist**: Fine-grained sender control
+- **🔒 Whitelist Mode**: Only accept emails from approved senders
+
+### Advanced Features
+- **🆔 PortID Ready**: Optional zero-knowledge authentication integration
+- **📊 Admin Dashboard**: Complete user and consent management
+- **🔄 Background Services**: Automatic categorization and encryption
 
 ---
 
@@ -109,6 +130,8 @@ Copy the DKIM record from logs and add it to your DNS.
 ### Admin Panel (`https://admin.yourdomain.com/warofbest/`)
 - Create/manage email accounts
 - Automatic encryption key generation
+- Consent & pay-to-send management
+- Whitelist/blacklist configuration
 - User management
 - System monitoring
 
