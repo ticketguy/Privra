@@ -217,6 +217,125 @@ def init_database():
         )
     """)
 
+    # Create user profiles table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_profiles (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) UNIQUE NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            display_name VARCHAR(255),
+            bio TEXT,
+            avatar_url TEXT,
+            profile_type VARCHAR(20) DEFAULT 'individual',
+            organization_name VARCHAR(255),
+            organization_domain VARCHAR(255),
+            website_url TEXT,
+            twitter_handle VARCHAR(255),
+            github_handle VARCHAR(255),
+            linkedin_url TEXT,
+            is_verified BOOLEAN DEFAULT FALSE,
+            verification_method VARCHAR(50),
+            nft_badge_mint VARCHAR(255),
+            reputation_score INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create organization profiles table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS organization_profiles (
+            id SERIAL PRIMARY KEY,
+            org_email VARCHAR(255) UNIQUE NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            org_name VARCHAR(255) NOT NULL,
+            org_type VARCHAR(50),
+            industry VARCHAR(100),
+            employee_count VARCHAR(50),
+            founded_year INTEGER,
+            description TEXT,
+            logo_url TEXT,
+            banner_url TEXT,
+            verified_domain VARCHAR(255),
+            domain_verified BOOLEAN DEFAULT FALSE,
+            nft_badge_mint VARCHAR(255),
+            reputation_score INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create user wallets table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_wallets (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            wallet_address VARCHAR(255) NOT NULL,
+            wallet_type VARCHAR(20) DEFAULT 'solana',
+            is_primary BOOLEAN DEFAULT FALSE,
+            is_verified BOOLEAN DEFAULT FALSE,
+            verified_at TIMESTAMP,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_email, wallet_address)
+        )
+    """)
+
+    # Create NFT verifications table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS nft_verifications (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            nft_mint_address VARCHAR(255) UNIQUE NOT NULL,
+            nft_name VARCHAR(255),
+            nft_symbol VARCHAR(10),
+            nft_image_url TEXT,
+            verification_type VARCHAR(50),
+            verified_domain VARCHAR(255),
+            reputation_level VARCHAR(20) DEFAULT 'unverified',
+            reputation_score INTEGER DEFAULT 0,
+            metadata_uri TEXT,
+            is_active BOOLEAN DEFAULT TRUE,
+            minted_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create reputation scores table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS reputation_scores (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) UNIQUE NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            total_score INTEGER DEFAULT 0,
+            email_score INTEGER DEFAULT 0,
+            verification_score INTEGER DEFAULT 0,
+            payment_score INTEGER DEFAULT 0,
+            trust_score INTEGER DEFAULT 0,
+            spam_reports INTEGER DEFAULT 0,
+            positive_interactions INTEGER DEFAULT 0,
+            negative_interactions INTEGER DEFAULT 0,
+            emails_sent INTEGER DEFAULT 0,
+            emails_received INTEGER DEFAULT 0,
+            reputation_level VARCHAR(20) DEFAULT 'new',
+            nft_sync_status VARCHAR(20) DEFAULT 'pending',
+            last_nft_update TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create reputation events table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS reputation_events (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            event_type VARCHAR(50) NOT NULL,
+            event_category VARCHAR(50),
+            score_change INTEGER,
+            description TEXT,
+            metadata JSONB,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # Create default admin user (admin/admin) - CHANGE THIS!
     import bcrypt
     default_password = bcrypt.hashpw(b'admin', bcrypt.gensalt()).decode('utf-8')

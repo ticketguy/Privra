@@ -15,7 +15,7 @@ from typing import Dict, Optional, Tuple
 class X402PaymentService:
     """X402 payment request generator and verifier"""
 
-    # Network configurations
+    # Network configurations (Mainnet only)
     NETWORKS = {
         'solana-mainnet': {
             'name': 'Solana Mainnet',
@@ -23,23 +23,11 @@ class X402PaymentService:
             'rpc_url': os.getenv('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com'),
             'explorer': 'https://solscan.io/tx/'
         },
-        'solana-devnet': {
-            'name': 'Solana Devnet',
-            'usdc_address': '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',  # Devnet USDC
-            'rpc_url': os.getenv('SOLANA_RPC_URL', 'https://api.devnet.solana.com'),
-            'explorer': 'https://solscan.io/tx/'
-        },
         'base-mainnet': {
             'name': 'Base Mainnet',
             'usdc_address': '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',  # USDC on Base
             'rpc_url': os.getenv('BASE_RPC_URL', 'https://mainnet.base.org'),
             'explorer': 'https://basescan.org/tx/'
-        },
-        'base-sepolia': {
-            'name': 'Base Sepolia',
-            'usdc_address': '0x036CbD53842c5426634e7929541eC2318f3dCF7e',  # USDC on Base Sepolia
-            'rpc_url': os.getenv('BASE_RPC_URL', 'https://sepolia.base.org'),
-            'explorer': 'https://sepolia.basescan.org/tx/'
         }
     }
 
@@ -54,7 +42,7 @@ class X402PaymentService:
 
         # Payment configuration
         self.default_amount_usdc = os.getenv('X402_DEFAULT_AMOUNT_USDC', '0.01')  # $0.01
-        self.default_network = os.getenv('X402_DEFAULT_NETWORK', 'base-sepolia')
+        self.default_network = os.getenv('X402_DEFAULT_NETWORK', 'solana-mainnet')
         self.payment_address_solana = os.getenv('X402_SOLANA_ADDRESS', '')
         self.payment_address_base = os.getenv('X402_BASE_ADDRESS', '')
         self.payment_timeout_seconds = int(os.getenv('X402_TIMEOUT_SECONDS', '3600'))  # 1 hour
