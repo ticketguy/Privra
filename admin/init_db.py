@@ -183,12 +183,37 @@ def init_database():
             consent_request_id INTEGER REFERENCES consent_requests(id) ON DELETE CASCADE,
             sender_email VARCHAR(255) NOT NULL,
             recipient_email VARCHAR(255) NOT NULL,
-            amount_sats INTEGER NOT NULL,
+            amount_sats INTEGER,
+            amount_usdc VARCHAR(50),
             payment_method VARCHAR(50),
+            payment_network VARCHAR(50),
             txid VARCHAR(255) UNIQUE,
+            blockchain_address VARCHAR(255),
+            x402_payment_header TEXT,
+            x402_settlement_data TEXT,
             status VARCHAR(20) DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             confirmed_at TIMESTAMP
+        )
+    """)
+
+    # Create X402 payment requests table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS x402_payment_requests (
+            id SERIAL PRIMARY KEY,
+            consent_request_id INTEGER REFERENCES consent_requests(id) ON DELETE CASCADE,
+            sender_email VARCHAR(255) NOT NULL,
+            recipient_email VARCHAR(255) NOT NULL,
+            payment_address VARCHAR(255) NOT NULL,
+            amount_usdc VARCHAR(50) NOT NULL,
+            network VARCHAR(50) NOT NULL,
+            asset_address VARCHAR(255),
+            payment_url TEXT,
+            token VARCHAR(255) UNIQUE NOT NULL,
+            status VARCHAR(20) DEFAULT 'pending',
+            expires_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            paid_at TIMESTAMP
         )
     """)
 

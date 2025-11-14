@@ -393,6 +393,153 @@ def add_blacklist(email):
 
     return redirect(url_for('consent_settings', email=email))
 
+# X402 Payment Routes (Public - no login required for AI agents)
+@app.route('/x402/pay/<token>', methods=['GET'])
+def x402_payment_page(token):
+    """Display X402 payment request page for AI agents and senders"""
+    try:
+        # Import X402 service
+        import sys
+        sys.path.append('/app')
+        sys.path.append('../postfix')
+        from x402_service import x402_service
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Get payment request details
+        cur.execute("""
+            SELECT pr.id, pr.sender_email, pr.recipient_email, pr.amount_usdc,
+                   pr.network, pr.payment_address, pr.asset_address, pr.expires_at, pr.status,
+                   cr.email_subject
+            FROM x402_payment_requests pr
+            JOIN consent_requests cr ON pr.consent_request_id = cr.id
+            WHERE pr.token = %s
+        """, (token,))
+
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if not result:
+            return jsonify({"error": "Payment request not found"}), 404
+
+        payment_id, sender, recipient, amount_usdc, network, pay_to, asset, expires_at, status, subject = result
+
+        # Check if already paid
+        if status == 'paid':
+            return render_template_string(X402_PAID_TEMPLATE, sender=sender, recipient=recipient)
+
+        # Check if expired
+        from datetime import datetime
+        if datetime.now() > expires_at:
+            return jsonify({"error": "Payment request expired"}), 410
+
+        # Build payment requirement
+        network_config = x402_service.NETWORKS.get(network, {})
+        amount_atomic = str(int(float(amount_usdc) * 1_000_000))
+
+        payment_requirement = {
+            "x402Version": 1,
+            "accepts": [
+                {
+                    "scheme": "exact",
+                    "network": network,
+                    "maxAmountRequired": amount_atomic,
+                    "resource": f"/x402/pay/{token}",
+                    "description": f"Email delivery to {recipient}",
+                    "mimeType": "application/json",
+                    "payTo": pay_to,
+                    "maxTimeoutSeconds": 3600,
+                    "asset": asset,
+                    "extra": {
+                        "sender": sender,
+                        "recipient": recipient,
+                        "token": token,
+                        "type": "email_consent"
+                    }
+                }
+            ],
+            "error": f"Payment required to send email to {recipient}"
+        }
+
+        # Return JSON for AI agents or HTML for browsers
+        if request.headers.get('Accept', '').startswith('application/json'):
+            return jsonify(payment_requirement), 402
+        else:
+            return render_template_string(
+                X402_PAYMENT_TEMPLATE,
+                sender=sender,
+                recipient=recipient,
+                amount_usdc=amount_usdc,
+                network=network,
+                network_name=network_config.get('name', network),
+                pay_to=pay_to,
+                token=token,
+                subject=subject,
+                payment_requirement=json.dumps(payment_requirement, indent=2)
+            )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/x402/verify/<token>', methods=['POST'])
+def x402_verify_payment(token):
+    """Verify X402 payment"""
+    try:
+        # Get payment header from request
+        payment_header = request.headers.get('X-PAYMENT')
+        if not payment_header:
+            # Try JSON body
+            data = request.get_json()
+            payment_header = data.get('paymentHeader') if data else None
+
+        if not payment_header:
+            return jsonify({"error": "Missing X-PAYMENT header"}), 400
+
+        # Import X402 service
+        import sys
+        sys.path.append('/app')
+        sys.path.append('../postfix')
+        from x402_service import x402_service
+
+        # Verify payment
+        is_valid, error = x402_service.verify_payment(token, payment_header)
+
+        if is_valid:
+            return jsonify({
+                "success": True,
+                "message": "Payment verified. Email will be delivered."
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "error": error or "Payment verification failed"
+            }), 400
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/x402/status/<token>', methods=['GET'])
+def x402_payment_status(token):
+    """Check X402 payment status"""
+    try:
+        # Import X402 service
+        import sys
+        sys.path.append('/app')
+        sys.path.append('../postfix')
+        from x402_service import x402_service
+
+        status = x402_service.check_payment_status(token)
+
+        if status is None:
+            return jsonify({"error": "Payment request not found"}), 404
+
+        return jsonify({"status": status}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # HTML Templates
 LOGIN_TEMPLATE = '''
 <!DOCTYPE html>
@@ -806,6 +953,132 @@ CONSENT_TEMPLATE = '''
             <p style="color: #666; font-style: italic;">No entries in blacklist</p>
             {% endif %}
         </div>
+    </div>
+</body>
+</html>
+'''
+
+X402_PAYMENT_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payment Required - X402</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .container { max-width: 700px; margin: 20px; background: white; padding: 40px; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
+        h2 { color: #667eea; margin: 30px 0 15px 0; font-size: 20px; }
+        .status-code { background: #667eea; color: white; padding: 8px 16px; border-radius: 6px; display: inline-block; font-weight: bold; margin-bottom: 20px; }
+        .info-box { background: #f8f9fa; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .info-box strong { color: #667eea; }
+        .payment-details { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .payment-details div { margin: 10px 0; display: flex; justify-content: space-between; }
+        .payment-details .label { color: #666; font-weight: 600; }
+        .payment-details .value { color: #333; font-family: monospace; word-break: break-all; }
+        .code-block { background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 8px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 12px; margin: 15px 0; }
+        .btn { display: inline-block; padding: 14px 28px; background: #667eea; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.3s; border: none; cursor: pointer; }
+        .btn:hover { background: #5568d3; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+        .network-badge { background: #28a745; color: white; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-left: 10px; }
+        .warning { background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 6px; margin: 20px 0; color: #856404; }
+        .ai-agent-note { background: #e7f3ff; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ Payment Required</h1>
+        <div class="status-code">HTTP 402</div>
+
+        <div class="info-box">
+            <strong>From:</strong> {{ sender }}<br>
+            <strong>To:</strong> {{ recipient }}<br>
+            <strong>Subject:</strong> {{ subject }}
+        </div>
+
+        <p style="margin: 20px 0; color: #666; line-height: 1.6;">
+            This recipient requires payment for email delivery from unauthorized senders.
+            This helps prevent spam and ensures only serious senders reach the inbox.
+        </p>
+
+        <h2>💰 Payment Details</h2>
+        <div class="payment-details">
+            <div>
+                <span class="label">Amount:</span>
+                <span class="value">${{ amount_usdc }} USDC</span>
+            </div>
+            <div>
+                <span class="label">Network:</span>
+                <span class="value">{{ network_name }} <span class="network-badge">{{ network }}</span></span>
+            </div>
+            <div>
+                <span class="label">Payment Address:</span>
+                <span class="value">{{ pay_to }}</span>
+            </div>
+        </div>
+
+        <div class="ai-agent-note">
+            <strong>🤖 AI Agents:</strong> Use the X402 protocol to pay programmatically.
+            Send USDC on {{ network_name }} to the address above, then submit the payment proof via the X-PAYMENT header.
+        </div>
+
+        <h2>📝 X402 Payment Requirement</h2>
+        <div class="code-block">{{ payment_requirement }}</div>
+
+        <h2>🔗 How to Pay</h2>
+        <div style="margin: 20px 0;">
+            <ol style="margin-left: 20px; line-height: 1.8;">
+                <li>Send <strong>${{ amount_usdc }} USDC</strong> to the payment address above on <strong>{{ network_name }}</strong></li>
+                <li>Get your transaction hash/signature</li>
+                <li>Submit payment proof via POST to <code>/x402/verify/{{ token }}</code></li>
+                <li>Your email will be automatically delivered once payment is verified</li>
+            </ol>
+        </div>
+
+        <div class="warning">
+            <strong>⏰ Note:</strong> This payment request expires in 1 hour.
+            Once paid, the sender will be approved and can send emails without future payments.
+        </div>
+
+        <div style="margin-top: 30px; text-align: center;">
+            <p style="color: #666; font-size: 14px;">
+                Powered by <strong>X402 Protocol</strong> • Privra Mail Server<br>
+                <a href="https://x402.org" style="color: #667eea;">Learn more about X402</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+X402_PAID_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payment Confirmed - X402</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .container { max-width: 600px; margin: 20px; background: white; padding: 50px; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center; }
+        h1 { color: #11998e; margin-bottom: 20px; font-size: 32px; }
+        .checkmark { font-size: 80px; color: #38ef7d; margin-bottom: 20px; }
+        p { color: #666; line-height: 1.6; margin: 15px 0; }
+        .email-info { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 30px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="checkmark">✓</div>
+        <h1>Payment Confirmed!</h1>
+        <p>Your payment has been verified and your email will be delivered shortly.</p>
+
+        <div class="email-info">
+            <strong>From:</strong> {{ sender }}<br>
+            <strong>To:</strong> {{ recipient }}
+        </div>
+
+        <p style="font-size: 14px; color: #999;">
+            You are now approved to send emails to this recipient. Future emails will be delivered without payment.
+        </p>
     </div>
 </body>
 </html>

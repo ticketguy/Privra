@@ -135,7 +135,7 @@ class ConsentPolicy:
             if require_consent or require_payment:
                 # Check for pending consent request
                 cur.execute("""
-                    SELECT token FROM consent_requests
+                    SELECT id, token FROM consent_requests
                     WHERE recipient_email = %s AND sender_email = %s
                     AND status = 'pending'
                     AND (expires_at IS NULL OR expires_at > NOW())
@@ -153,16 +153,82 @@ class ConsentPolicy:
                         INSERT INTO consent_requests
                         (recipient_email, sender_email, token, email_subject, expires_at)
                         VALUES (%s, %s, %s, %s, %s)
+                        RETURNING id
                     """, (recipient, sender, token, subject, expires_at))
+                    consent_request_id = cur.fetchone()[0]
                     conn.commit()
 
-                    # TODO: Send consent request notification to recipient
+                    # Generate X402 payment request if payment required
+                    payment_url = None
+                    if require_payment:
+                        try:
+                            # Get payment amount from settings
+                            cur.execute("""
+                                SELECT payment_amount_sats FROM consent_settings
+                                WHERE user_email = %s
+                            """, (recipient,))
+                            payment_result = cur.fetchone()
+                            payment_amount_sats = payment_result[0] if payment_result else 1000
 
-                cur.close()
-                conn.close()
+                            # Convert sats to USDC (rough estimation: 1 sat ≈ $0.0003)
+                            # For now, use a fixed USDC amount
+                            amount_usdc = os.getenv('X402_DEFAULT_AMOUNT_USDC', '0.01')
 
-                # Defer the email (will be retried later)
-                return f'DEFER Consent required. Sender {sender} must request permission from {recipient}'
+                            # Import X402 service
+                            from x402_service import x402_service
+
+                            # Generate payment request
+                            payment_request = x402_service.generate_payment_request(
+                                sender_email=sender,
+                                recipient_email=recipient,
+                                consent_request_id=consent_request_id,
+                                amount_usdc=amount_usdc
+                            )
+
+                            payment_url = payment_request['payment_url']
+                            print(f"Generated X402 payment request: {payment_url}", file=sys.stderr)
+
+                        except Exception as e:
+                            print(f"Error generating X402 payment request: {e}", file=sys.stderr)
+                            import traceback
+                            traceback.print_exc(file=sys.stderr)
+
+                    cur.close()
+                    conn.close()
+
+                    # Defer the email with payment URL if available
+                    if payment_url:
+                        return f'DEFER Payment required (HTTP 402). Pay at: {payment_url} to send email to {recipient}. AI agents: Use X402 protocol.'
+                    else:
+                        return f'DEFER Consent required. Sender {sender} must request permission from {recipient}'
+                else:
+                    # Existing consent request - check if it has X402 payment
+                    consent_request_id = existing[0]
+
+                    # Check if payment already made
+                    cur.execute("""
+                        SELECT payment_url, status FROM x402_payment_requests
+                        WHERE consent_request_id = %s
+                        ORDER BY created_at DESC LIMIT 1
+                    """, (consent_request_id,))
+                    x402_result = cur.fetchone()
+
+                    cur.close()
+                    conn.close()
+
+                    if x402_result and x402_result[0]:
+                        payment_url = x402_result[0]
+                        payment_status = x402_result[1]
+
+                        if payment_status == 'paid':
+                            # Payment completed, allow email through
+                            return 'DUNNO'
+                        else:
+                            # Payment pending
+                            return f'DEFER Payment required (HTTP 402). Pay at: {payment_url} to send email to {recipient}. AI agents: Use X402 protocol.'
+                    else:
+                        # No X402 payment, use standard consent message
+                        return f'DEFER Consent required. Sender {sender} must request permission from {recipient}'
 
             cur.close()
             conn.close()
