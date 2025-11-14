@@ -63,7 +63,7 @@ class NFTVerificationService:
 
     def get_nft_metadata(self, nft_mint_address: str) -> Optional[Dict]:
         """
-        Fetch NFT metadata from Solana
+        Fetch NFT metadata from Solana - NFT image becomes profile avatar
 
         Args:
             nft_mint_address: NFT mint address
@@ -72,88 +72,100 @@ class NFTVerificationService:
             NFT metadata dict or None
         """
         try:
-            # TODO: Implement Solana RPC call to get NFT metadata
-            # For now, return placeholder data
+            import requests
 
-            return {
-                'name': f'Privra Verified Badge',
-                'symbol': 'PRVRF',
-                'image': 'https://privra.com/assets/nft-badge.png',
-                'description': 'Verified email sender with reputation tracking',
-                'attributes': [
-                    {'trait_type': 'Verification Type', 'value': 'Domain'},
-                    {'trait_type': 'Reputation Level', 'value': 'Trusted'},
-                    {'trait_type': 'Reputation Score', 'value': '0'}
+            # Get NFT metadata from Solana
+            rpc_url = self.solana_rpc_url
+
+            # Method 1: Use Metaplex metadata account
+            payload = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "getAccountInfo",
+                "params": [
+                    nft_mint_address,
+                    {"encoding": "jsonParsed"}
                 ]
             }
+
+            response = requests.post(rpc_url, json=payload, timeout=10)
+            data = response.json()
+
+            if 'result' in data and data['result']:
+                # Parse metadata
+                # This is simplified - production would need full Metaplex parsing
+
+                # For now, use placeholder but structure for real implementation
+                return {
+                    'name': f'NFT {nft_mint_address[:8]}',
+                    'symbol': 'NFT',
+                    'image': f'https://arweave.net/placeholder',  # Would be actual URI
+                    'description': 'User profile NFT',
+                    'attributes': []
+                }
+
+            return None
 
         except Exception as e:
             print(f"Error getting NFT metadata: {e}", file=sys.stderr)
             return None
 
-    def register_nft_verification(
+    def set_nft_as_avatar(
         self,
         user_email: str,
         nft_mint_address: str,
-        wallet_address: str,
-        verification_type: str = 'domain',
-        verified_domain: str = None
-    ) -> bool:
+        wallet_address: str
+    ) -> Tuple[bool, str]:
         """
-        Register NFT verification for user
+        Set NFT image as user's profile avatar (like Gmail profile picture)
 
         Args:
             user_email: User's email
             nft_mint_address: NFT mint address
             wallet_address: User's wallet address
-            verification_type: Type of verification
-            verified_domain: Domain being verified
 
         Returns:
-            bool: Success status
+            Tuple of (success, message)
         """
         try:
             # Verify ownership
             is_verified, message = self.verify_nft_ownership(user_email, nft_mint_address, wallet_address)
 
             if not is_verified:
-                print(f"NFT verification failed: {message}", file=sys.stderr)
-                return False
+                return False, f"NFT verification failed: {message}"
 
-            # Get NFT metadata
+            # Get NFT metadata (includes image URL)
             metadata = self.get_nft_metadata(nft_mint_address)
             if not metadata:
-                print(f"Failed to fetch NFT metadata", file=sys.stderr)
-                return False
+                return False, "Failed to fetch NFT metadata"
+
+            nft_image_url = metadata.get('image')
+            if not nft_image_url:
+                return False, "NFT has no image"
 
             conn = self.get_db()
             cur = conn.cursor()
 
-            # Insert or update NFT verification
+            # Store NFT verification
             cur.execute("""
                 INSERT INTO nft_verifications
-                (user_email, nft_mint_address, nft_name, nft_symbol, nft_image_url,
-                 verification_type, verified_domain, minted_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                (user_email, nft_mint_address, nft_name, nft_symbol, nft_image_url, minted_at)
+                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 ON CONFLICT (nft_mint_address)
                 DO UPDATE SET
                     is_active = TRUE,
                     updated_at = CURRENT_TIMESTAMP
-                RETURNING id
-            """, (user_email, nft_mint_address, metadata.get('name'), metadata.get('symbol'),
-                  metadata.get('image'), verification_type, verified_domain))
+            """, (user_email, nft_mint_address, metadata.get('name'),
+                  metadata.get('symbol'), nft_image_url))
 
-            verification_id = cur.fetchone()[0]
-
-            # Update user profile with verification
+            # Update user profile - set NFT image as avatar
             cur.execute("""
                 UPDATE user_profiles
-                SET is_verified = TRUE,
-                    verification_method = %s,
+                SET avatar_url = %s,
                     nft_badge_mint = %s,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE user_email = %s
-            """, (verification_type, nft_mint_address, user_email))
+            """, (nft_image_url, nft_mint_address, user_email))
 
             # Record reputation event
             from reputation_service import reputation_service
@@ -161,22 +173,21 @@ class NFTVerificationService:
                 user_email,
                 'nft_verified',
                 'verification',
-                f'NFT verification via {verification_type}',
-                {'nft_mint': nft_mint_address, 'domain': verified_domain}
+                'Set NFT as profile avatar',
+                {'nft_mint': nft_mint_address}
             )
 
             conn.commit()
             cur.close()
             conn.close()
 
-            print(f"NFT verification registered: {user_email} - {nft_mint_address}", file=sys.stderr)
-            return True
+            return True, f"NFT image set as profile avatar"
 
         except Exception as e:
-            print(f"Error registering NFT verification: {e}", file=sys.stderr)
+            print(f"Error setting NFT as avatar: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc(file=sys.stderr)
-            return False
+            return False, str(e)
 
     def update_nft_reputation(self, user_email: str) -> bool:
         """
@@ -283,6 +294,50 @@ class NFTVerificationService:
             print(f"Error getting verification badge: {e}", file=sys.stderr)
             return None
 
+    def generate_domain_verification_token(self, user_email: str, domain: str) -> str:
+        """
+        Generate unique verification token for domain
+
+        Args:
+            user_email: User's email
+            domain: Domain to verify
+
+        Returns:
+            Verification token
+        """
+        import hashlib
+        import secrets
+
+        # Generate unique token
+        salt = secrets.token_hex(16)
+        data = f"{user_email}:{domain}:{salt}"
+        token = hashlib.sha256(data.encode()).hexdigest()[:32]
+
+        # Store in database
+        try:
+            conn = self.get_db()
+            cur = conn.cursor()
+
+            cur.execute("""
+                INSERT INTO domain_verifications
+                (user_email, domain, verification_token, created_at)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_email, domain)
+                DO UPDATE SET
+                    verification_token = %s,
+                    verified = FALSE,
+                    created_at = CURRENT_TIMESTAMP
+            """, (user_email, domain, token, token))
+
+            conn.commit()
+            cur.close()
+            conn.close()
+
+        except Exception as e:
+            print(f"Error storing verification token: {e}", file=sys.stderr)
+
+        return token
+
     def verify_domain_ownership(self, user_email: str, domain: str) -> Tuple[bool, str]:
         """
         Verify user owns a domain via DNS TXT record
@@ -295,22 +350,104 @@ class NFTVerificationService:
             Tuple of (verified, message)
         """
         try:
-            # TODO: Implement DNS verification
-            # Should check for TXT record like: privra-verify=<token>
+            import dns.resolver
 
-            # Extract domain from email
-            email_domain = user_email.split('@')[1] if '@' in user_email else ''
+            # Get verification token from database
+            conn = self.get_db()
+            cur = conn.cursor()
 
-            if email_domain.lower() == domain.lower():
-                # User's email domain matches
-                return True, "Domain matches email"
+            cur.execute("""
+                SELECT verification_token FROM domain_verifications
+                WHERE user_email = %s AND domain = %s
+            """, (user_email, domain))
 
-            # Placeholder - always succeeds for development
-            return True, "Domain verification placeholder"
+            result = cur.fetchone()
+            cur.close()
+            conn.close()
 
+            if not result:
+                return False, "No verification token found. Generate one first."
+
+            expected_token = result[0]
+
+            # Check for TXT record: privra-verify=<token>
+            try:
+                txt_records = dns.resolver.resolve(domain, 'TXT')
+
+                for record in txt_records:
+                    txt_value = record.to_text().strip('"')
+
+                    # Check for our verification record
+                    if txt_value.startswith('privra-verify='):
+                        token_from_dns = txt_value.split('=', 1)[1]
+
+                        if token_from_dns == expected_token:
+                            # Verification successful!
+                            self._mark_domain_verified(user_email, domain)
+                            return True, "Domain verified successfully"
+
+                return False, f"TXT record not found. Add: privra-verify={expected_token}"
+
+            except dns.resolver.NXDOMAIN:
+                return False, f"Domain {domain} does not exist"
+            except dns.resolver.NoAnswer:
+                return False, f"No TXT records found for {domain}"
+            except dns.resolver.Timeout:
+                return False, "DNS query timed out"
+
+        except ImportError:
+            return False, "DNS verification not available (dnspython not installed)"
         except Exception as e:
             print(f"Error verifying domain: {e}", file=sys.stderr)
             return False, str(e)
+
+    def _mark_domain_verified(self, user_email: str, domain: str):
+        """Mark domain as verified in database"""
+        try:
+            conn = self.get_db()
+            cur = conn.cursor()
+
+            # Update domain_verifications
+            cur.execute("""
+                UPDATE domain_verifications
+                SET verified = TRUE,
+                    verified_at = CURRENT_TIMESTAMP
+                WHERE user_email = %s AND domain = %s
+            """, (user_email, domain))
+
+            # Update user profile
+            cur.execute("""
+                UPDATE user_profiles
+                SET is_verified = TRUE,
+                    verification_method = 'domain',
+                    organization_domain = %s
+                WHERE user_email = %s
+            """, (domain, user_email))
+
+            # Update organization profile if exists
+            cur.execute("""
+                UPDATE organization_profiles
+                SET verified_domain = %s,
+                    domain_verified = TRUE
+                WHERE org_email = %s
+            """, (domain, user_email))
+
+            # Record reputation event
+            from reputation_service import reputation_service
+            reputation_service.record_event(
+                user_email,
+                'domain_verified',
+                'verification',
+                f'Domain {domain} verified via DNS TXT',
+                {'domain': domain}
+            )
+
+            conn.commit()
+            cur.close()
+            conn.close()
+
+        except Exception as e:
+            print(f"Error marking domain verified: {e}", file=sys.stderr)
 
 
 # Global instance
