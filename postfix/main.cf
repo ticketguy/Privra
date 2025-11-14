@@ -46,3 +46,9 @@ biff = no
 append_dot_mydomain = no
 readme_directory = no
 compatibility_level = 3.6
+
+# DKIM milter configuration
+milter_default_action = accept
+milter_protocol = 6
+smtpd_milters = inet:localhost:8891
+non_smtpd_milters = inet:localhost:8891

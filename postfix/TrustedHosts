@@ -1,0 +1,7 @@
+# Trusted hosts for DKIM signing
+127.0.0.1
+localhost
+::1
+*.privra.xyz
+privra.xyz
+172.18.0.0/16

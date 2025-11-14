@@ -47,6 +47,7 @@ services:
     volumes:
       - mail-queue:/var/spool/postfix
       - mail-storage:/var/mail
+      - dkim-keys:/etc/opendkim/keys
       - ./certs:/etc/ssl/mail:ro
     networks:
       - mailnet
@@ -155,3 +156,4 @@ volumes:
   redis-data:
   mail-storage:
   mail-queue:
+  dkim-keys:

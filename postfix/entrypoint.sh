@@ -26,6 +26,22 @@ mkdir -p /var/spool/postfix/maildrop
 touch /etc/postfix/aliases
 postalias /etc/postfix/aliases
 
+# Generate DKIM keys if they don't exist
+if [ ! -f /etc/opendkim/keys/$MAIL_DOMAIN/mail.private ]; then
+    echo "Generating DKIM keys for $MAIL_DOMAIN..."
+    mkdir -p /etc/opendkim/keys/$MAIL_DOMAIN
+    opendkim-genkey -b 2048 -d $MAIL_DOMAIN -D /etc/opendkim/keys/$MAIL_DOMAIN -s mail -v
+    chown -R opendkim:opendkim /etc/opendkim/keys
+    chmod 600 /etc/opendkim/keys/$MAIL_DOMAIN/mail.private
+    echo ""
+    echo "========================================="
+    echo "DKIM DNS Record (add this to your DNS):"
+    echo "========================================="
+    cat /etc/opendkim/keys/$MAIL_DOMAIN/mail.txt
+    echo "========================================="
+    echo ""
+fi
+
 echo "Postfix configured. Starting services..."
 
 # Start services using supervisord

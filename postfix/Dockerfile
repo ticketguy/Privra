@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Postfix, PostgreSQL client, Python, and rsyslog
+# Install Postfix, PostgreSQL client, Python, rsyslog, and OpenDKIM
 RUN apt-get update && apt-get install -y \
     postfix \
     postfix-pgsql \
@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     rsyslog \
+    opendkim \
+    opendkim-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies for content filter
@@ -29,6 +31,11 @@ COPY pgsql-virtual-alias-maps.cf /etc/postfix/
 COPY sasl/smtpd.conf /etc/postfix/sasl/smtpd.conf
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY entrypoint.sh /entrypoint.sh
+
+# Copy OpenDKIM configuration
+COPY opendkim.conf /etc/opendkim.conf
+COPY TrustedHosts /etc/opendkim/TrustedHosts
+RUN mkdir -p /etc/opendkim/keys && chown -R opendkim:opendkim /etc/opendkim
 
 # Copy content filters, policy services, and crypto utilities
 RUN mkdir -p /app
