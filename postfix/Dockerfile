@@ -32,8 +32,7 @@ COPY sasl/smtpd.conf /etc/postfix/sasl/smtpd.conf
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY entrypoint.sh /entrypoint.sh
 
-# Copy OpenDKIM configuration
-COPY opendkim.conf /etc/opendkim.conf
+# Copy OpenDKIM configuration (opendkim.conf is generated dynamically in entrypoint.sh)
 COPY TrustedHosts /etc/opendkim/TrustedHosts
 RUN mkdir -p /etc/opendkim/keys && chown -R opendkim:opendkim /etc/opendkim
 
