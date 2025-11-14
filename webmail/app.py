@@ -12,7 +12,15 @@ from datetime import datetime, timedelta
 import os
 import psycopg2
 from portid_service import portid_service
-from crypto_utils import decrypt_private_key_with_recovery_key
+from crypto_utils import (
+    decrypt_private_key_with_recovery_key,
+    generate_email_keypair,
+    serialize_public_key,
+    serialize_private_key,
+    encrypt_private_key_with_recovery_key
+)
+from Crypto.Random import get_random_bytes
+import bcrypt
 from email_categorizer import EmailCategorizer
 
 app = Flask(__name__)
@@ -97,10 +105,71 @@ def get_email_body(msg):
 
 @app.route('/')
 def index():
-    """Home page - redirect to inbox if logged in"""
+    """Home page - redirect to dashboard if logged in"""
     if 'email' in session:
-        return redirect(url_for('inbox'))
+        return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
+
+@app.route('/dashboard')
+def dashboard():
+    """Dashboard with stats and features"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        mail = connect_imap(session['email'], session['password'])
+        if not mail:
+            return redirect(url_for('login'))
+
+        # Get inbox count
+        mail.select('INBOX')
+        status, messages = mail.search(None, 'ALL')
+        total_emails = len(messages[0].split()) if messages[0] else 0
+
+        # Get unread count
+        status, unread = mail.search(None, 'UNSEEN')
+        unread_count = len(unread[0].split()) if unread[0] else 0
+
+        mail.logout()
+
+        # Get encryption status
+        has_encryption = session.get('has_encryption', False)
+
+        # Get consent settings
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT require_consent, whitelist_mode
+            FROM consent_settings
+            WHERE user_email = %s
+        """, (session['email'],))
+        consent_settings = cur.fetchone()
+        require_consent = consent_settings[0] if consent_settings else False
+        whitelist_mode = consent_settings[1] if consent_settings else False
+
+        # Get whitelist/blacklist counts
+        cur.execute("SELECT COUNT(*) FROM sender_whitelist WHERE recipient_email = %s", (session['email'],))
+        whitelist_count = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM sender_blacklist WHERE recipient_email = %s", (session['email'],))
+        blacklist_count = cur.fetchone()[0]
+
+        cur.close()
+        conn.close()
+
+        return render_template('dashboard.html',
+                             total_emails=total_emails,
+                             unread_count=unread_count,
+                             has_encryption=has_encryption,
+                             require_consent=require_consent,
+                             whitelist_mode=whitelist_mode,
+                             whitelist_count=whitelist_count,
+                             blacklist_count=blacklist_count)
+
+    except Exception as e:
+        print(f"Dashboard error: {e}")
+        return redirect(url_for('inbox'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -191,6 +260,120 @@ def login():
             flash('Invalid email or password', 'error')
 
     return render_template('login.html', portid_enabled=portid_service.is_enabled())
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """User registration page"""
+    if request.method == 'POST':
+        email_addr = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        # Validation
+        if not email_addr or not password:
+            flash('Email and password are required', 'error')
+            return render_template('register.html')
+
+        if '@' not in email_addr:
+            flash('Invalid email address', 'error')
+            return render_template('register.html')
+
+        if password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return render_template('register.html')
+
+        if len(password) < 8:
+            flash('Password must be at least 8 characters', 'error')
+            return render_template('register.html')
+
+        # Extract domain
+        domain = email_addr.split('@')[1]
+
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+
+            # Check if user already exists
+            cur.execute("SELECT email FROM users WHERE email = %s", (email_addr,))
+            if cur.fetchone():
+                flash('Email address already registered', 'error')
+                cur.close()
+                conn.close()
+                return render_template('register.html')
+
+            # Check if domain exists
+            cur.execute("SELECT domain FROM domains WHERE domain = %s", (domain,))
+            if not cur.fetchone():
+                flash(f'Domain {domain} is not configured for this mail server', 'error')
+                cur.close()
+                conn.close()
+                return render_template('register.html')
+
+            # Hash password
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+            # Generate recovery key (32 bytes hex - same as PortID)
+            recovery_key = get_random_bytes(32).hex()
+
+            # Generate email encryption keys
+            private_key, public_key = generate_email_keypair()
+            public_key_pem = serialize_public_key(public_key)
+            private_key_pem = serialize_private_key(private_key)
+
+            # Encrypt private key with recovery key
+            encrypted_private_key = encrypt_private_key_with_recovery_key(
+                private_key_pem, recovery_key
+            )
+
+            # Insert user into database
+            cur.execute("""
+                INSERT INTO users
+                (email, password, domain, recovery_key, email_public_key, email_private_key_encrypted, active)
+                VALUES (%s, %s, %s, %s, %s, %s, TRUE)
+            """, (email_addr, hashed_password, domain, recovery_key, public_key_pem, encrypted_private_key))
+
+            # Create default consent settings
+            cur.execute("""
+                INSERT INTO consent_settings (user_email, require_consent, whitelist_mode)
+                VALUES (%s, FALSE, FALSE)
+            """, (email_addr,))
+
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            # Store recovery key in session to show to user
+            session['show_recovery_key'] = recovery_key
+            session['recovery_email'] = email_addr
+
+            flash('Account created successfully!', 'success')
+            return redirect(url_for('show_recovery_key'))
+
+        except Exception as e:
+            print(f"Registration error: {e}")
+            flash('Error creating account. Please try again.', 'error')
+            return render_template('register.html')
+
+    return render_template('register.html')
+
+@app.route('/recovery-key')
+def show_recovery_key():
+    """Show recovery key to newly registered user"""
+    if 'show_recovery_key' not in session:
+        return redirect(url_for('login'))
+
+    recovery_key = session.get('show_recovery_key')
+    email = session.get('recovery_email')
+
+    return render_template('show_recovery_key.html', recovery_key=recovery_key, email=email)
+
+@app.route('/recovery-key/confirm', methods=['POST'])
+def confirm_recovery_key():
+    """User confirms they've saved their recovery key"""
+    session.pop('show_recovery_key', None)
+    session.pop('recovery_email', None)
+    flash('You can now log in with your email and password', 'success')
+    return redirect(url_for('login'))
 
 @app.route('/api/private-key')
 def get_private_key():
@@ -650,6 +833,45 @@ def remove_blacklist(id):
         flash('Error removing from blacklist', 'error')
 
     return redirect(url_for('consent_settings'))
+
+@app.route('/settings/account')
+def account_settings():
+    """Account settings page"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Get user info
+        cur.execute("""
+            SELECT email, domain, recovery_key, auth_type, active, created_at
+            FROM users
+            WHERE email = %s
+        """, (session['email'],))
+        user_info = cur.fetchone()
+
+        cur.close()
+        conn.close()
+
+        if not user_info:
+            flash('User not found', 'error')
+            return redirect(url_for('dashboard'))
+
+        return render_template('account_settings.html',
+                             email=user_info[0],
+                             domain=user_info[1],
+                             has_recovery_key=bool(user_info[2]),
+                             auth_type=user_info[3] or 'password',
+                             active=user_info[4],
+                             created_at=user_info[5],
+                             has_encryption=session.get('has_encryption', False))
+
+    except Exception as e:
+        print(f"Error loading account settings: {e}")
+        flash('Error loading account settings', 'error')
+        return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)

@@ -174,10 +174,12 @@
         <h1>📧 Privra Webmail</h1>
         <nav>
             {% if session.email %}
-                <span>{{ session.email }}</span>
+                <span style="margin-right: 1rem;">{{ session.email }}</span>
+                <a href="{{ url_for('dashboard') }}">Dashboard</a>
                 <a href="{{ url_for('inbox') }}">Inbox</a>
                 <a href="{{ url_for('compose') }}">Compose</a>
-                <a href="{{ url_for('consent_settings') }}">Settings</a>
+                <a href="{{ url_for('consent_settings') }}">Privacy</a>
+                <a href="{{ url_for('account_settings') }}">Account</a>
                 <a href="{{ url_for('logout') }}">Logout</a>
             {% endif %}
         </nav>

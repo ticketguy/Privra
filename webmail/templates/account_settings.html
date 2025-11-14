@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Account Settings - Privra Webmail{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="margin-bottom: 1.5rem;">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
+    </div>
+
+    <h2 style="margin-bottom: 2rem;">Account Settings</h2>
+
+    <!-- Account Information -->
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 2rem;">
+        <h3 style="margin-top: 0;">Account Information</h3>
+
+        <div style="display: grid; gap: 1rem;">
+            <div>
+                <label style="font-weight: bold; color: #666; display: block; margin-bottom: 0.25rem;">Email Address</label>
+                <div style="font-size: 1.1em;">{{ email }}</div>
+            </div>
+
+            <div>
+                <label style="font-weight: bold; color: #666; display: block; margin-bottom: 0.25rem;">Domain</label>
+                <div style="font-size: 1.1em;">{{ domain }}</div>
+            </div>
+
+            <div>
+                <label style="font-weight: bold; color: #666; display: block; margin-bottom: 0.25rem;">Authentication Type</label>
+                <div style="font-size: 1.1em;">
+                    {% if auth_type == 'portid' %}
+                        PortID (Zero-Knowledge)
+                    {% else %}
+                        Password
+                    {% endif %}
+                </div>
+            </div>
+
+            <div>
+                <label style="font-weight: bold; color: #666; display: block; margin-bottom: 0.25rem;">Account Status</label>
+                <div style="font-size: 1.1em;">
+                    {% if active %}
+                        <span style="color: #27ae60; font-weight: bold;">✓ Active</span>
+                    {% else %}
+                        <span style="color: #e74c3c; font-weight: bold;">✗ Inactive</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div>
+                <label style="font-weight: bold; color: #666; display: block; margin-bottom: 0.25rem;">Member Since</label>
+                <div style="font-size: 1.1em;">
+                    {{ created_at.strftime('%B %d, %Y') if created_at else 'Unknown' }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Encryption Status -->
+    <div style="background: {% if has_encryption %}#d4edda{% else %}#fff3cd{% endif %};
+                border: 2px solid {% if has_encryption %}#c3e6cb{% else %}#ffeeba{% endif %};
+                padding: 20px; border-radius: 5px; margin-bottom: 2rem;">
+        <h3 style="margin-top: 0; color: {% if has_encryption %}#155724{% else %}#856404{% endif %};">
+            {% if has_encryption %}🔒{% else %}⚠️{% endif %} End-to-End Encryption
+        </h3>
+
+        {% if has_encryption %}
+            <p style="color: #155724; margin-bottom: 1rem;">
+                <strong>Status: Enabled</strong><br>
+                Your emails to other Privra users are automatically encrypted end-to-end.
+                Your private key is encrypted with your recovery key.
+            </p>
+            <div style="background: white; padding: 15px; border-radius: 5px; margin-top: 1rem;">
+                <strong>Recovery Key:</strong>
+                <span style="color: #666;">Securely stored (hidden for security)</span>
+                <br>
+                <small style="color: #666;">
+                    Your recovery key is needed to decrypt your private key if you forget your password.
+                    Contact an administrator if you need to recover your key.
+                </small>
+            </div>
+        {% else %}
+            <p style="color: #856404; margin-bottom: 1rem;">
+                <strong>Status: Not Configured</strong><br>
+                Encryption keys were not generated for your account.
+                Please contact an administrator to enable encryption.
+            </p>
+        {% endif %}
+    </div>
+
+    <!-- Security Features -->
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 2rem;">
+        <h3 style="margin-top: 0;">Security Features</h3>
+
+        <div style="display: grid; gap: 1rem;">
+            <div style="padding: 15px; background: white; border-radius: 5px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <strong>Privacy & Consent Settings</strong>
+                        <p style="color: #666; margin: 0.5rem 0 0 0; font-size: 0.9em;">
+                            Control who can send you emails, manage whitelist/blacklist
+                        </p>
+                    </div>
+                    <a href="{{ url_for('consent_settings') }}" class="btn btn-primary" style="padding: 0.5rem 1rem;">
+                        Manage →
+                    </a>
+                </div>
+            </div>
+
+            <div style="padding: 15px; background: white; border-radius: 5px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <strong>Change Password</strong>
+                        <p style="color: #666; margin: 0.5rem 0 0 0; font-size: 0.9em;">
+                            Update your account password
+                        </p>
+                    </div>
+                    <button class="btn btn-secondary" style="padding: 0.5rem 1rem;" disabled>
+                        Coming Soon
+                    </button>
+                </div>
+            </div>
+
+            <div style="padding: 15px; background: white; border-radius: 5px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <strong>Two-Factor Authentication</strong>
+                        <p style="color: #666; margin: 0.5rem 0 0 0; font-size: 0.9em;">
+                            Add an extra layer of security with 2FA
+                        </p>
+                    </div>
+                    <button class="btn btn-secondary" style="padding: 0.5rem 1rem;" disabled>
+                        Coming Soon
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feature Status -->
+    <div style="background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; padding: 15px; border-radius: 5px;">
+        <strong>Active Features on Your Account:</strong>
+        <ul style="margin: 10px 0 0 20px;">
+            <li>End-to-end encryption: {% if has_encryption %}✓ Enabled{% else %}✗ Disabled{% endif %}</li>
+            <li>Gateway encryption: ✓ Enabled (automatic)</li>
+            <li>Email categorization: ✓ Enabled (automatic)</li>
+            <li>Privacy controls: ✓ Available</li>
+            <li>PortID support: ✓ Available</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
