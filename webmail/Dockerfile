@@ -6,20 +6,20 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y supervisor && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
-COPY requirements.txt .
+COPY webmail/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
-COPY . .
+COPY webmail/ .
 
 # Copy postfix services (for imports)
-COPY ../postfix/*.py .
+COPY postfix/*.py .
 
 # Create necessary directories
 RUN mkdir -p /app/attachments /var/log/supervisor
 
 # Copy supervisor config
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY webmail/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 EXPOSE 5001
 

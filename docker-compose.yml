@@ -103,7 +103,9 @@ services:
 
   # Webmail - Email client interface
   webmail:
-    build: ./webmail
+    build:
+      context: .
+      dockerfile: webmail/Dockerfile
     restart: always
     environment:
       - SECRET_KEY=${SECRET_KEY}
