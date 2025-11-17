@@ -1,437 +1,234 @@
 #!/bin/bash
-# Privra Mail - Universal Deployment Script
-# Handles initial setup, fixes, updates, and maintenance
+# Privra Mail Server - Automated Deployment Script
+# Run with: sudo bash deploy.sh
 
-set -e
+set -e  # Exit on error
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+echo "================================================"
+echo "  Privra Mail Server - Deployment Script"
+echo "================================================"
+echo ""
 
-# Colors for output
+# Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Helper functions
-print_header() {
-    echo ""
-    echo "=========================================="
-    echo "$1"
-    echo "=========================================="
-    echo ""
-}
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then
+    echo -e "${RED}Error: Please run as root (use sudo)${NC}"
+    exit 1
+fi
 
-print_success() {
-    echo -e "${GREEN}✅ $1${NC}"
-}
+# Get domain name
+echo -e "${YELLOW}Enter your domain name (e.g., example.com):${NC}"
+read -r DOMAIN
+echo ""
 
-print_error() {
-    echo -e "${RED}❌ $1${NC}"
-}
+echo -e "${YELLOW}Enter your mail subdomain (e.g., mail):${NC}"
+read -r MAIL_SUBDOMAIN
+MAIL_DOMAIN="${MAIL_SUBDOMAIN}.${DOMAIN}"
+echo ""
 
-print_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
-}
+echo -e "${YELLOW}Enter PostgreSQL password for privra_user:${NC}"
+read -s DB_PASSWORD
+echo ""
 
-print_info() {
-    echo -e "${BLUE}ℹ️  $1${NC}"
-}
+echo -e "${YELLOW}Enter Flask secret key (leave empty to generate):${NC}"
+read -r SECRET_KEY
+if [ -z "$SECRET_KEY" ]; then
+    SECRET_KEY=$(openssl rand -hex 32)
+fi
+echo ""
 
-check_docker() {
-    print_info "Checking Docker installation..."
+# Update system
+echo -e "${GREEN}[1/12] Updating system...${NC}"
+apt update && apt upgrade -y
 
-    if ! command -v docker &> /dev/null; then
-        print_error "Docker is not installed"
-        echo "Please install Docker first: https://docs.docker.com/engine/install/"
-        exit 1
-    fi
+# Install dependencies
+echo -e "${GREEN}[2/12] Installing dependencies...${NC}"
+apt install -y python3 python3-pip python3-venv postgresql postgresql-contrib \
+    postfix dovecot-core dovecot-imapd dovecot-lmtpd \
+    nginx certbot python3-certbot-nginx \
+    git curl build-essential libpq-dev opendkim opendkim-tools \
+    ufw htop
 
-    if ! docker compose version &> /dev/null; then
-        print_error "Docker Compose is not available"
-        echo "Please install Docker Compose: https://docs.docker.com/compose/install/"
-        exit 1
-    fi
+# Set up Python environment
+echo -e "${GREEN}[3/12] Setting up Python environment...${NC}"
+python3 -m venv /opt/privra/venv
+source /opt/privra/venv/bin/activate
+pip install --upgrade pip
+pip install -r /opt/privra/requirements.txt
 
-    print_success "Docker is available"
-}
+# Configure PostgreSQL
+echo -e "${GREEN}[4/12] Configuring PostgreSQL...${NC}"
+sudo -u postgres psql -c "CREATE DATABASE privra;" 2>/dev/null || echo "Database already exists"
+sudo -u postgres psql -c "CREATE USER privra_user WITH PASSWORD '$DB_PASSWORD';" 2>/dev/null || echo "User already exists"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE privra TO privra_user;"
+sudo -u postgres psql -c "ALTER DATABASE privra OWNER TO privra_user;"
 
-check_env_file() {
-    print_info "Checking environment configuration..."
+# Initialize database
+echo -e "${GREEN}[5/12] Initializing database...${NC}"
+cd /opt/privra/admin
+source /opt/privra/venv/bin/activate
+python init_db.py
 
-    if [ ! -f "$PROJECT_DIR/.env" ]; then
-        print_warning ".env file not found"
+# Create .env file
+echo -e "${GREEN}[6/12] Creating environment configuration...${NC}"
+cat > /opt/privra/.env << EOF
+# Database
+DB_HOST=localhost
+DB_NAME=privra
+DB_USER=privra_user
+DB_PASSWORD=$DB_PASSWORD
 
-        if [ -f "$PROJECT_DIR/.env.example" ]; then
-            print_info "Creating .env from .env.example"
-            cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
-            print_warning "Please edit .env file with your configuration:"
-            echo "  - MAIL_DOMAIN"
-            echo "  - MAIL_HOSTNAME"
-            echo "  - DB_PASSWORD"
-            echo "  - SECRET_KEY"
-            echo ""
-            echo "Run this script again after editing .env"
-            exit 0
-        else
-            print_error ".env.example not found"
-            exit 1
-        fi
-    fi
+# Flask
+SECRET_KEY=$SECRET_KEY
+FLASK_ENV=production
 
-    # Check if required variables are set
-    source "$PROJECT_DIR/.env"
+# Mail Server
+MAIL_DOMAIN=$DOMAIN
+MAIL_SERVER=$MAIL_DOMAIN
 
-    local missing=0
-    [ -z "$MAIL_DOMAIN" ] && print_warning "MAIL_DOMAIN not set in .env" && missing=1
-    [ -z "$MAIL_HOSTNAME" ] && print_warning "MAIL_HOSTNAME not set in .env" && missing=1
-    [ -z "$DB_PASSWORD" ] && print_warning "DB_PASSWORD not set in .env" && missing=1
-    [ -z "$SECRET_KEY" ] && print_warning "SECRET_KEY not set in .env" && missing=1
+# DKIM
+DKIM_SELECTOR=default
+DKIM_PRIVATE_KEY_PATH=/etc/postfix/dkim/private.key
 
-    if [ $missing -eq 1 ]; then
-        print_error "Please configure all required variables in .env"
-        exit 1
-    fi
-
-    print_success "Environment configuration OK"
-}
-
-check_ssl_certs() {
-    print_info "Checking SSL certificates..."
-
-    if [ ! -f "$PROJECT_DIR/certs/mail.crt" ] || [ ! -f "$PROJECT_DIR/certs/mail.key" ]; then
-        print_warning "SSL certificates not found in certs/ directory"
-        print_info "You'll need to add certificates before HTTPS will work"
-        print_info "Place your certificates as:"
-        echo "  - certs/mail.crt"
-        echo "  - certs/mail.key"
-        return 1
-    fi
-
-    # Check if certificate needs expansion (intermediate certs)
-    if grep -q "CERTIFICATE" "$PROJECT_DIR/certs/mail.crt"; then
-        local cert_count=$(grep -c "BEGIN CERTIFICATE" "$PROJECT_DIR/certs/mail.crt")
-        if [ "$cert_count" -eq 1 ]; then
-            print_warning "Certificate may need intermediate chain"
-            print_info "If you have certificate chain issues, the script will fix it"
-        fi
-    fi
-
-    print_success "SSL certificates found"
-    return 0
-}
-
-fix_ssl_cert() {
-    print_info "Fixing SSL certificate chain..."
-
-    if [ ! -f "$PROJECT_DIR/certs/mail.crt" ]; then
-        print_warning "No certificate to fix"
-        return
-    fi
-
-    # Check if cert is already expanded
-    local cert_count=$(grep -c "BEGIN CERTIFICATE" "$PROJECT_DIR/certs/mail.crt" 2>/dev/null || echo "0")
-
-    if [ "$cert_count" -gt 1 ]; then
-        print_success "Certificate already has full chain"
-        return
-    fi
-
-    # Look for intermediate cert
-    if [ -f "$PROJECT_DIR/certs/intermediate.crt" ] || [ -f "$PROJECT_DIR/certs/ca-bundle.crt" ] || [ -f "$PROJECT_DIR/certs/chain.crt" ]; then
-        print_info "Found intermediate certificate, combining..."
-
-        local intermediate=""
-        [ -f "$PROJECT_DIR/certs/intermediate.crt" ] && intermediate="$PROJECT_DIR/certs/intermediate.crt"
-        [ -f "$PROJECT_DIR/certs/ca-bundle.crt" ] && intermediate="$PROJECT_DIR/certs/ca-bundle.crt"
-        [ -f "$PROJECT_DIR/certs/chain.crt" ] && intermediate="$PROJECT_DIR/certs/chain.crt"
-
-        if [ -n "$intermediate" ]; then
-            cp "$PROJECT_DIR/certs/mail.crt" "$PROJECT_DIR/certs/mail.crt.backup"
-            cat "$PROJECT_DIR/certs/mail.crt.backup" "$intermediate" > "$PROJECT_DIR/certs/mail.crt"
-            print_success "Certificate chain expanded"
-        fi
-    fi
-}
-
-initialize_database() {
-    print_info "Initializing database..."
-
-    # Start database first
-    docker compose up -d db
-
-    # Wait for database to be ready
-    print_info "Waiting for database to be ready..."
-    for i in {1..30}; do
-        if docker compose exec -T db pg_isready -U "${DB_USER:-privramail}" &> /dev/null; then
-            print_success "Database is ready"
-            return 0
-        fi
-        sleep 1
-    done
-
-    print_error "Database failed to start"
-    docker compose logs db
-    return 1
-}
-
-rebuild_webmail() {
-    print_info "Rebuilding webmail container..."
-
-    docker compose stop webmail 2>/dev/null || true
-    docker compose rm -f webmail 2>/dev/null || true
-    docker compose build --no-cache webmail
-    docker compose up -d webmail
-
-    # Wait for webmail to start
-    sleep 5
-
-    if docker compose ps webmail | grep -q "Up"; then
-        # Check for errors in logs
-        if docker compose logs --tail=20 webmail | grep -i "error\|exception\|traceback" | grep -v "INFO\|DEBUG" > /dev/null 2>&1; then
-            print_warning "Webmail started but has errors, checking logs..."
-            docker compose logs --tail=30 webmail
-            return 1
-        else
-            print_success "Webmail rebuilt and running"
-            return 0
-        fi
-    else
-        print_error "Webmail failed to start"
-        docker compose logs --tail=30 webmail
-        return 1
-    fi
-}
-
-check_dkim() {
-    print_info "Checking DKIM configuration..."
-
-    # Check if DKIM keys exist
-    if docker compose exec -T postfix test -f /etc/opendkim/keys/default.private &> /dev/null; then
-        print_success "DKIM keys found"
-
-        # Get DKIM public key
-        print_info "DKIM DNS Record (add this to your DNS):"
-        echo ""
-        docker compose exec -T postfix cat /etc/opendkim/keys/default.txt 2>/dev/null || \
-            print_warning "Could not read DKIM public key"
-        echo ""
-    else
-        print_warning "DKIM keys not found - they will be generated on first start"
-    fi
-}
-
-start_services() {
-    print_info "Starting all services..."
-
-    cd "$PROJECT_DIR"
-    docker compose up -d
-
-    print_info "Waiting for services to start..."
-    sleep 5
-
-    # Check service status
-    local failed=0
-
-    for service in db redis postfix dovecot webmail admin nginx; do
-        if docker compose ps $service | grep -q "Up"; then
-            print_success "$service is running"
-        else
-            print_error "$service failed to start"
-            failed=1
-        fi
-    done
-
-    return $failed
-}
-
-show_status() {
-    print_header "System Status"
-
-    docker compose ps
-
-    echo ""
-    print_info "Access Points:"
-    source "$PROJECT_DIR/.env"
-    echo "  Webmail:     https://${MAIL_HOSTNAME}/"
-    echo "  Admin Panel: https://${MAIL_HOSTNAME}/warofbest"
-    echo "  SMTP:        ${MAIL_HOSTNAME}:587 (STARTTLS)"
-    echo "  IMAP:        ${MAIL_HOSTNAME}:993 (SSL)"
-    echo ""
-}
-
-show_logs() {
-    local service=${1:-}
-
-    if [ -z "$service" ]; then
-        print_info "Showing logs for all services..."
-        docker compose logs --tail=50
-    else
-        print_info "Showing logs for $service..."
-        docker compose logs --tail=100 -f $service
-    fi
-}
-
-show_help() {
-    cat <<EOF
-Privra Mail - Universal Deployment Script
-
-Usage: $0 [command]
-
-Commands:
-    deploy       Deploy the mail server (default)
-    fix          Fix common issues (rebuild webmail, check DKIM, etc.)
-    rebuild      Rebuild and restart all containers
-    status       Show service status
-    logs         Show logs for all services
-    logs <svc>   Show logs for specific service
-    stop         Stop all services
-    start        Start all services
-    restart      Restart all services
-    help         Show this help message
-
-Examples:
-    $0              # Initial deployment
-    $0 deploy       # Same as above
-    $0 fix          # Fix issues (webmail, DKIM, SSL)
-    $0 rebuild      # Rebuild everything
-    $0 status       # Check status
-    $0 logs webmail # View webmail logs
-
+# Blockchain RPC
+SOLANA_RPC=https://api.mainnet-beta.solana.com
+ETHEREUM_RPC=https://eth.llamarpc.com
+BASE_RPC=https://mainnet.base.org
+POLYGON_RPC=https://polygon-rpc.com
+ARBITRUM_RPC=https://arb1.arbitrum.io/rpc
+OPTIMISM_RPC=https://mainnet.optimism.io
 EOF
+
+# Set up DKIM
+echo -e "${GREEN}[7/12] Setting up DKIM...${NC}"
+mkdir -p /etc/postfix/dkim
+cd /etc/postfix/dkim
+opendkim-genkey -t -s default -d $DOMAIN
+chown -R opendkim:opendkim /etc/postfix/dkim
+chmod 600 /etc/postfix/dkim/default.private
+
+# Display DKIM public key
+echo -e "${YELLOW}Add this DKIM DNS TXT record:${NC}"
+echo "default._domainkey.$DOMAIN TXT \"$(cat /etc/postfix/dkim/default.txt | grep -oP 'p=\K[^"]+' | tr -d '\n')\""
+echo ""
+
+# Configure Postfix (basic setup - user should review)
+echo -e "${GREEN}[8/12] Configuring Postfix...${NC}"
+cat >> /etc/postfix/main.cf << EOF
+
+# Privra Configuration
+myhostname = $MAIL_DOMAIN
+mydomain = $DOMAIN
+myorigin = \$mydomain
+mydestination = \$myhostname, localhost.\$mydomain, localhost, \$mydomain
+inet_interfaces = all
+inet_protocols = ipv4
+
+# SASL
+smtpd_sasl_type = dovecot
+smtpd_sasl_path = private/auth
+smtpd_sasl_auth_enable = yes
+EOF
+
+# Create Nginx configuration
+echo -e "${GREEN}[9/12] Configuring Nginx...${NC}"
+cat > /etc/nginx/sites-available/privra << EOF
+server {
+    listen 80;
+    server_name $MAIL_DOMAIN;
+    return 301 https://\$server_name\$request_uri;
 }
 
-# Main deployment function
-deploy() {
-    print_header "Privra Mail - Deployment"
+server {
+    listen 443 ssl http2;
+    server_name $MAIL_DOMAIN;
 
-    cd "$PROJECT_DIR"
+    # SSL will be configured by certbot
 
-    check_docker
-    check_env_file
-    check_ssl_certs || true
-
-    # Fix SSL if needed
-    fix_ssl_cert
-
-    # Initialize database
-    initialize_database || exit 1
-
-    # Start all services
-    start_services || {
-        print_error "Some services failed to start"
-        show_status
-        exit 1
+    location /static {
+        alias /opt/privra/webmail/static;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
     }
 
-    # Check DKIM
-    check_dkim
-
-    print_header "Deployment Complete!"
-
-    show_status
-
-    print_info "Next Steps:"
-    echo "  1. Add DKIM DNS record shown above"
-    echo "  2. Access webmail at https://${MAIL_HOSTNAME}/"
-    echo "  3. Create users via admin panel"
-    echo ""
-    print_info "View logs: $0 logs"
-    print_info "Check status: $0 status"
+    location / {
+        proxy_pass http://127.0.0.1:5001;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
 }
+EOF
 
-# Fix function for troubleshooting
-fix_issues() {
-    print_header "Privra Mail - Fix Issues"
+ln -sf /etc/nginx/sites-available/privra /etc/nginx/sites-enabled/
+nginx -t
+systemctl restart nginx
 
-    cd "$PROJECT_DIR"
+# Create systemd service
+echo -e "${GREEN}[10/12] Creating systemd service...${NC}"
+cat > /etc/systemd/system/privra-webmail.service << EOF
+[Unit]
+Description=Privra Webmail Application
+After=network.target postgresql.service
 
-    check_docker
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/privra/webmail
+Environment="PATH=/opt/privra/venv/bin"
+ExecStart=/opt/privra/venv/bin/python /opt/privra/webmail/app.py
+Restart=always
+RestartSec=10
 
-    # Fix SSL certificate
-    fix_ssl_cert
+[Install]
+WantedBy=multi-user.target
+EOF
 
-    # Rebuild webmail (common issue)
-    print_info "Rebuilding webmail to fix import errors..."
-    rebuild_webmail || print_warning "Webmail rebuild had issues"
+systemctl daemon-reload
+systemctl enable privra-webmail
+systemctl start privra-webmail
 
-    # Check DKIM
-    check_dkim
+# Configure firewall
+echo -e "${GREEN}[11/12] Configuring firewall...${NC}"
+ufw allow 'Nginx Full'
+ufw allow 22/tcp   # SSH
+ufw allow 25/tcp   # SMTP
+ufw allow 587/tcp  # Submission
+ufw allow 993/tcp  # IMAPS
+ufw allow 143/tcp  # IMAP
+echo "y" | ufw enable
 
-    # Restart all services
-    print_info "Restarting all services..."
-    docker compose restart
+# Get SSL certificate
+echo -e "${GREEN}[12/12] Getting SSL certificate...${NC}"
+echo -e "${YELLOW}Running certbot (follow the prompts)...${NC}"
+certbot --nginx -d $MAIL_DOMAIN
 
-    sleep 5
-
-    print_header "Fix Complete"
-    show_status
-}
-
-# Rebuild all containers
-rebuild_all() {
-    print_header "Rebuilding All Containers"
-
-    cd "$PROJECT_DIR"
-
-    check_docker
-
-    print_info "Stopping services..."
-    docker compose down
-
-    print_info "Rebuilding all containers (this may take a few minutes)..."
-    docker compose build --no-cache
-
-    print_info "Starting services..."
-    docker compose up -d
-
-    sleep 10
-
-    print_header "Rebuild Complete"
-    show_status
-}
-
-# Parse command
-COMMAND=${1:-deploy}
-
-case "$COMMAND" in
-    deploy)
-        deploy
-        ;;
-    fix)
-        fix_issues
-        ;;
-    rebuild)
-        rebuild_all
-        ;;
-    status)
-        show_status
-        ;;
-    logs)
-        show_logs "$2"
-        ;;
-    stop)
-        docker compose down
-        print_success "All services stopped"
-        ;;
-    start)
-        docker compose up -d
-        sleep 5
-        show_status
-        ;;
-    restart)
-        docker compose restart
-        sleep 5
-        show_status
-        ;;
-    help|--help|-h)
-        show_help
-        ;;
-    *)
-        print_error "Unknown command: $COMMAND"
-        echo ""
-        show_help
-        exit 1
-        ;;
-esac
+# Final status
+echo ""
+echo "================================================"
+echo -e "${GREEN}✓ Deployment Complete!${NC}"
+echo "================================================"
+echo ""
+echo "Next steps:"
+echo "1. Add these DNS records:"
+echo "   - A record: $MAIL_DOMAIN → YOUR_SERVER_IP"
+echo "   - MX record: $DOMAIN → $MAIL_DOMAIN (priority 10)"
+echo "   - TXT SPF: v=spf1 mx ~all"
+echo "   - TXT DKIM: (shown above)"
+echo "   - TXT DMARC: v=DMARC1; p=quarantine; rua=mailto:admin@$DOMAIN"
+echo ""
+echo "2. Access webmail at: https://$MAIL_DOMAIN"
+echo "3. Register your first user"
+echo "4. Test sending/receiving emails"
+echo ""
+echo "Service status:"
+systemctl status privra-webmail --no-pager
+echo ""
+echo "View logs: sudo journalctl -u privra-webmail -f"
+echo ""

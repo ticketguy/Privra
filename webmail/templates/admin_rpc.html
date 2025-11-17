@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}Admin RPC Settings - Privra{% endblock %}
+
+{% block content %}
+<style>
+    /* Anime-inspired gradient background */
+    .admin-container {
+        background: linear-gradient(135deg, #f59e0b 0%, #dc2626 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        animation: slideUp 0.5s ease-out;
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Glassmorphism cards */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        animation: fadeIn 0.6s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    .glass-card h2 {
+        color: white;
+        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+    }
+
+    .glass-card h3 {
+        color: white;
+        font-size: 1.2rem;
+        margin-bottom: 1rem;
+        font-weight: 500;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        color: white;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        font-size: 0.95rem;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="url"] {
+        width: 100%;
+        padding: 0.75rem;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-group input[type="text"]:focus,
+    .form-group input[type="url"]:focus {
+        outline: none;
+        border-color: rgba(255, 255, 255, 0.6);
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    .form-group input::placeholder {
+        color: rgba(255, 255, 255, 0.5);
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 0.75rem 2rem;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+    }
+
+    .info-text {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        border-left: 4px solid rgba(255, 255, 255, 0.5);
+    }
+
+    .success-message {
+        background: rgba(16, 185, 129, 0.2);
+        border: 1px solid rgba(16, 185, 129, 0.4);
+        color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        display: none;
+    }
+
+    .error-message {
+        background: rgba(239, 68, 68, 0.2);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        display: none;
+    }
+
+    .chain-icon {
+        display: inline-block;
+        margin-right: 0.5rem;
+    }
+
+    .active-badge {
+        display: inline-block;
+        background: rgba(16, 185, 129, 0.3);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-left: 0.5rem;
+    }
+
+    @media (max-width: 768px) {
+        .admin-container {
+            padding: 1rem;
+        }
+
+        .glass-card {
+            padding: 1rem;
+        }
+    }
+</style>
+
+<div class="admin-container">
+    <div class="glass-card">
+        <h2>🔧 Admin RPC Configuration</h2>
+        <p class="info-text">
+            <strong>⚠️ Administrator Settings</strong><br>
+            These are global RPC endpoints used as defaults for all users who haven't configured custom endpoints.
+            Changes here affect the entire system.<br>
+            <a href="{{ url_for('rpc_settings') }}" style="color: white; text-decoration: underline;">← Back to User RPC Settings</a>
+        </p>
+
+        <div id="success-msg" class="success-message"></div>
+        <div id="error-msg" class="error-message"></div>
+
+        {% if configs %}
+            {% for config in configs %}
+            <form class="rpc-config-form" data-config-id="{{ config[0] }}">
+                <h3>
+                    {{ config[1] }} Configuration
+                    {% if config[8] %}
+                    <span class="active-badge">✓ Active</span>
+                    {% endif %}
+                </h3>
+
+                <!-- Solana -->
+                <div class="form-group">
+                    <label>
+                        <span class="chain-icon">◎</span>
+                        Solana RPC URL
+                    </label>
+                    <input type="url" name="solana_rpc" value="{{ config[2] or '' }}" required>
+                </div>
+
+                <!-- Ethereum -->
+                <div class="form-group">
+                    <label>
+                        <span class="chain-icon">Ξ</span>
+                        Ethereum RPC URL
+                    </label>
+                    <input type="url" name="ethereum_rpc" value="{{ config[3] or '' }}" required>
+                </div>
+
+                <!-- Base -->
+                <div class="form-group">
+                    <label>
+                        <span class="chain-icon">🔵</span>
+                        Base RPC URL
+                    </label>
+                    <input type="url" name="base_rpc" value="{{ config[4] or '' }}" required>
+                </div>
+
+                <!-- Polygon -->
+                <div class="form-group">
+                    <label>
+                        <span class="chain-icon">⬢</span>
+                        Polygon RPC URL
+                    </label>
+                    <input type="url" name="polygon_rpc" value="{{ config[5] or '' }}" required>
+                </div>
+
+                <!-- Arbitrum -->
+                <div class="form-group">
+                    <label>
+                        <span class="chain-icon">🔷</span>
+                        Arbitrum RPC URL
+                    </label>
+                    <input type="url" name="arbitrum_rpc" value="{{ config[6] or '' }}" required>
+                </div>
+
+                <!-- Optimism -->
+                <div class="form-group">
+                    <label>
+                        <span class="chain-icon">🔴</span>
+                        Optimism RPC URL
+                    </label>
+                    <input type="url" name="optimism_rpc" value="{{ config[7] or '' }}" required>
+                </div>
+
+                <button type="submit" class="btn-primary">💾 Update Configuration</button>
+            </form>
+            {% endfor %}
+        {% else %}
+            <p class="info-text">No RPC configurations found. Please contact system administrator.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Handle all RPC config forms
+    document.querySelectorAll('.rpc-config-form').forEach(form => {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const configId = this.dataset.configId;
+            const formData = new FormData(this);
+            formData.append('config_id', configId);
+
+            try {
+                const response = await fetch('/admin/rpc/save', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const successMsg = document.getElementById('success-msg');
+                    successMsg.textContent = '✓ ' + result.message;
+                    successMsg.style.display = 'block';
+                    setTimeout(() => {
+                        successMsg.style.display = 'none';
+                    }, 3000);
+                } else {
+                    const errorMsg = document.getElementById('error-msg');
+                    errorMsg.textContent = '✗ ' + (result.error || 'Failed to update settings');
+                    errorMsg.style.display = 'block';
+                    setTimeout(() => {
+                        errorMsg.style.display = 'none';
+                    }, 5000);
+                }
+            } catch (error) {
+                const errorMsg = document.getElementById('error-msg');
+                errorMsg.textContent = '✗ Network error: ' + error.message;
+                errorMsg.style.display = 'block';
+                setTimeout(() => {
+                    errorMsg.style.display = 'none';
+                }, 5000);
+            }
+        });
+    });
+</script>
+{% endblock %}

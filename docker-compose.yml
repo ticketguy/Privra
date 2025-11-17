@@ -103,7 +103,9 @@ services:
 
   # Webmail - Email client interface
   webmail:
-    build: ./webmail
+    build:
+      context: .
+      dockerfile: webmail/Dockerfile
     restart: always
     environment:
       - SECRET_KEY=${SECRET_KEY}
@@ -129,8 +131,12 @@ services:
 
   # Nginx - SSL termination & reverse proxy
   nginx:
-    image: nginx:alpine
+    build: ./nginx
     restart: always
+    environment:
+      - MAIL_DOMAIN=${MAIL_DOMAIN}
+      - WEBMAIL_HOSTNAME=${WEBMAIL_HOSTNAME:-mail.${MAIL_DOMAIN}}
+      - ADMIN_HOSTNAME=${ADMIN_HOSTNAME:-admin.${MAIL_DOMAIN}}
     ports:
       - "80:80"
       - "443:443"
@@ -138,7 +144,6 @@ services:
       - "587:587"
       - "993:993"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./certs:/etc/ssl/mail:ro
     networks:
       - mailnet

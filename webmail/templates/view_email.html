@@ -3,24 +3,162 @@
 {% block title %}{{ subject }} - Privra Webmail{% endblock %}
 
 {% block content %}
+<style>
+    .sender-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.5rem;
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+    }
+
+    .sender-avatar-large {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid var(--border-color);
+    }
+
+    .sender-avatar-placeholder-large {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 1.5rem;
+    }
+
+    .sender-info-detail {
+        flex: 1;
+    }
+
+    .sender-name {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+        color: var(--text-primary);
+    }
+
+    .sender-email {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.5rem;
+    }
+
+    .verification-badges {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .verification-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.75rem;
+        padding: 0.3rem 0.7rem;
+        border-radius: 12px;
+        font-weight: 600;
+        color: white;
+    }
+
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+        .sender-header {
+            padding: 1rem;
+        }
+
+        .sender-avatar-large,
+        .sender-avatar-placeholder-large {
+            width: 48px;
+            height: 48px;
+            font-size: 1.2rem;
+        }
+
+        .sender-name {
+            font-size: 1rem;
+        }
+
+        .sender-email {
+            font-size: 0.85rem;
+        }
+
+        .verification-badge {
+            font-size: 0.7rem;
+            padding: 0.25rem 0.6rem;
+        }
+
+        .email-header h2 {
+            font-size: 1.3rem;
+            word-break: break-word;
+        }
+
+        .email-meta {
+            font-size: 0.9rem;
+        }
+
+        .email-body {
+            font-size: 0.95rem;
+            padding: 1rem;
+        }
+
+        .card > div[style*="margin-bottom"] .btn {
+            width: 100%;
+            text-align: center;
+        }
+    }
+</style>
+
 <div class="card">
     <div style="margin-bottom: 1rem;">
         <a href="{{ url_for('inbox') }}" class="btn btn-secondary">← Back to Inbox</a>
     </div>
 
+    <!-- Sender Header with Avatar -->
+    <div class="sender-header">
+        {% if verification.avatar_url %}
+            <img src="{{ verification.avatar_url }}" class="sender-avatar-large" alt="Avatar">
+        {% else %}
+            <div class="sender-avatar-placeholder-large">
+                {{ from_addr[0]|upper }}
+            </div>
+        {% endif %}
+
+        <div class="sender-info-detail">
+            {% if verification.display_name %}
+                <div class="sender-name">{{ verification.display_name }}</div>
+                <div class="sender-email">{{ from_addr }}</div>
+            {% else %}
+                <div class="sender-name">{{ from_addr }}</div>
+            {% endif %}
+
+            <div class="verification-badges">
+                {% for badge in verification.badges %}
+                    <span class="verification-badge" style="background: {{ badge.color }};">
+                        {{ badge.icon }} {{ badge.text }}
+                    </span>
+                {% endfor %}
+
+                <!-- Encryption Badge -->
+                {% if is_encrypted %}
+                    <span class="verification-badge" style="background: #10b981;">
+                        🔒 End-to-end Encrypted
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
     <div class="email-header">
         <h2>{{ subject }}</h2>
 
-        <!-- Encryption Badge -->
-        {% if is_encrypted %}
-        <div style="display: inline-block; background: #d4edda; color: #155724; padding: 5px 10px; border-radius: 4px; font-size: 12px; margin-left: 10px;">
-            🔒 End-to-end Encrypted
-        </div>
-        {% endif %}
-
-        <div class="email-meta">
-            <strong>From:</strong> {{ from_addr }}
-        </div>
         <div class="email-meta">
             <strong>To:</strong> {{ to_addr }}
         </div>

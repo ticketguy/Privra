@@ -4,24 +4,72 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Privra Webmail{% endblock %}</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Privacy-first encrypted email with Web3 integration">
+    <meta name="theme-color" content="#764ba2">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Privra Mail">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+
+    <!-- Theme System -->
+    <link rel="stylesheet" href="/static/themes.css">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/static/icons/icon-192x192.png">
+    <link rel="shortcut icon" href="/static/icons/icon-72x72.png">
+
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+
+        /* Animated gradient background */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5;
+            background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #4facfe);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
             line-height: 1.6;
+            min-height: 100vh;
+            position: relative;
         }
+
+        /* Liquid gradient animation */
+        @keyframes gradientShift {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        /* Glassmorphic header */
         .header {
-            background: #2c3e50;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             color: white;
             padding: 1rem 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
         .header h1 {
             font-size: 1.5rem;
@@ -31,11 +79,14 @@
             text-decoration: none;
             margin-left: 1.5rem;
             padding: 0.5rem 1rem;
-            border-radius: 4px;
-            transition: background 0.3s;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.1);
         }
         .header nav a:hover {
-            background: #34495e;
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
         .container {
             max-width: 1200px;
@@ -47,24 +98,57 @@
         }
         .flash {
             padding: 1rem;
-            border-radius: 4px;
+            border-radius: 12px;
             margin-bottom: 0.5rem;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            animation: slideIn 0.4s ease-out;
         }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .flash.success {
-            background: #d4edda;
+            background: rgba(212, 237, 218, 0.9);
             color: #155724;
-            border: 1px solid #c3e6cb;
+            border-color: rgba(195, 230, 203, 0.8);
         }
         .flash.error {
-            background: #f8d7da;
+            background: rgba(248, 215, 218, 0.9);
             color: #721c24;
-            border: 1px solid #f5c6cb;
+            border-color: rgba(245, 198, 203, 0.8);
         }
+
+        /* Glassmorphic card */
         .card {
-            background: white;
-            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 16px;
             padding: 2rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         .form-group {
             margin-bottom: 1.5rem;
@@ -73,113 +157,326 @@
             display: block;
             margin-bottom: 0.5rem;
             font-weight: 500;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
         .form-group input,
         .form-group textarea {
             width: 100%;
             padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 12px;
             font-size: 1rem;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .form-group input::placeholder,
+        .form-group textarea::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
         }
         .form-group textarea {
             min-height: 200px;
             resize: vertical;
         }
+
+        /* Glassmorphic buttons */
         .btn {
             padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
             font-size: 1rem;
+            font-weight: 600;
             cursor: pointer;
             text-decoration: none;
             display: inline-block;
-            transition: opacity 0.3s;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+        .btn:hover::before {
+            left: 100%;
         }
         .btn:hover {
-            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
         }
         .btn-primary {
-            background: #3498db;
+            background: rgba(52, 152, 219, 0.8);
             color: white;
+        }
+        .btn-primary:hover {
+            background: rgba(52, 152, 219, 0.9);
         }
         .btn-success {
-            background: #27ae60;
+            background: rgba(39, 174, 96, 0.8);
             color: white;
+        }
+        .btn-success:hover {
+            background: rgba(39, 174, 96, 0.9);
         }
         .btn-secondary {
-            background: #95a5a6;
+            background: rgba(149, 165, 166, 0.8);
             color: white;
         }
+        .btn-secondary:hover {
+            background: rgba(149, 165, 166, 0.9);
+        }
         .btn-danger {
-            background: #e74c3c;
+            background: rgba(231, 76, 60, 0.8);
             color: white;
+        }
+        .btn-danger:hover {
+            background: rgba(231, 76, 60, 0.9);
         }
         .email-list {
             list-style: none;
         }
         .email-item {
             padding: 1rem;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             display: flex;
             justify-content: space-between;
-            transition: background 0.2s;
+            transition: all 0.3s ease;
+            border-radius: 12px;
+            margin-bottom: 0.5rem;
         }
         .email-item:hover {
-            background: #f8f9fa;
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateX(5px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
         }
         .email-item a {
-            color: inherit;
+            color: white;
             text-decoration: none;
             flex: 1;
         }
         .email-subject {
             font-weight: 600;
             margin-bottom: 0.25rem;
+            color: white;
         }
         .email-from {
-            color: #666;
+            color: rgba(255, 255, 255, 0.8);
             font-size: 0.9rem;
         }
         .email-date {
-            color: #999;
+            color: rgba(255, 255, 255, 0.7);
             font-size: 0.85rem;
             white-space: nowrap;
             margin-left: 1rem;
         }
         .email-body {
-            background: #f8f9fa;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             padding: 1.5rem;
-            border-radius: 4px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
             white-space: pre-wrap;
             word-wrap: break-word;
             margin-top: 1rem;
+            color: white;
         }
         .email-header {
-            border-bottom: 2px solid #eee;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
             padding-bottom: 1rem;
             margin-bottom: 1rem;
         }
+        .email-header h2 {
+            color: white;
+        }
         .email-meta {
             margin: 0.5rem 0;
-            color: #666;
+            color: rgba(255, 255, 255, 0.9);
         }
         .email-meta strong {
-            color: #333;
+            color: white;
+        }
+
+        /* Mobile Optimizations */
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+                flex-wrap: wrap;
+            }
+
+            .header h1 {
+                font-size: 1.2rem;
+                margin-bottom: 0;
+            }
+
+            .header nav {
+                position: fixed;
+                top: 0;
+                left: -100%;
+                width: 80%;
+                max-width: 300px;
+                height: 100vh;
+                background: rgba(255, 255, 255, 0.15);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border-right: 1px solid rgba(255, 255, 255, 0.2);
+                z-index: 1000;
+                padding: 1rem;
+                transition: left 0.3s ease;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .header nav.active {
+                left: 0;
+            }
+
+            .header nav a,
+            .header nav span,
+            .header nav button {
+                margin: 0.5rem 0;
+                margin-left: 0 !important;
+                display: block;
+                text-align: left;
+                width: 100%;
+            }
+
+            .mobile-menu-toggle {
+                display: block;
+                background: none;
+                border: none;
+                color: white;
+                font-size: 1.5rem;
+                cursor: pointer;
+                padding: 0.5rem;
+                margin-left: auto;
+            }
+
+            .mobile-menu-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 999;
+            }
+
+            .mobile-menu-overlay.active {
+                display: block;
+            }
+
+            .container {
+                margin: 1rem auto;
+                padding: 0 0.75rem;
+            }
+
+            .card {
+                padding: 1rem;
+            }
+
+            .btn {
+                padding: 0.6rem 1.2rem;
+                font-size: 0.95rem;
+            }
+
+            /* Improve touch targets */
+            .header nav a,
+            .btn {
+                min-height: 44px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            /* Responsive typography */
+            body {
+                font-size: 0.95rem;
+            }
+
+            .email-subject {
+                font-size: 0.95rem;
+            }
+
+            .email-from {
+                font-size: 0.85rem;
+            }
+
+            .email-date {
+                font-size: 0.8rem;
+            }
+        }
+
+        .mobile-menu-toggle {
+            display: none;
+        }
+
+        /* Mobile navigation close button */
+        .mobile-nav-close {
+            display: none;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            align-self: flex-end;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-nav-close {
+                display: block;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Mobile menu overlay -->
+    <div class="mobile-menu-overlay" id="mobile-menu-overlay" onclick="toggleMobileMenu()"></div>
+
     <div class="header">
         <h1>📧 Privra Webmail</h1>
-        <nav>
+        <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle menu">
+            ☰
+        </button>
+        <nav id="mobile-nav">
+            <button class="mobile-nav-close" onclick="toggleMobileMenu()" aria-label="Close menu">
+                ✕
+            </button>
             {% if session.email %}
                 <span style="margin-right: 1rem;">{{ session.email }}</span>
                 <a href="{{ url_for('dashboard') }}">Dashboard</a>
                 <a href="{{ url_for('inbox') }}">Inbox</a>
                 <a href="{{ url_for('compose') }}">Compose</a>
+                <a href="{{ url_for('profile') }}">Profile</a>
+                <a href="{{ url_for('wallet') }}">Wallet</a>
                 <a href="{{ url_for('consent_settings') }}">Privacy</a>
+                <a href="{{ url_for('rpc_settings') }}">RPC</a>
                 <a href="{{ url_for('account_settings') }}">Account</a>
+                <button class="theme-toggle" onclick="toggleTheme()" title="Change theme (click to cycle)">
+                    <span id="theme-toggle-btn">🌓</span>
+                    <span class="theme-indicator" id="theme-indicator">Auto</span>
+                </button>
                 <a href="{{ url_for('logout') }}">Logout</a>
             {% endif %}
         </nav>
@@ -198,5 +495,76 @@
 
         {% block content %}{% endblock %}
     </div>
+
+    <!-- Theme System -->
+    <script src="/static/theme-toggle.js"></script>
+
+    <!-- Mobile Menu Toggle -->
+    <script>
+        function toggleMobileMenu() {
+            const nav = document.getElementById('mobile-nav');
+            const overlay = document.getElementById('mobile-menu-overlay');
+
+            nav.classList.toggle('active');
+            overlay.classList.toggle('active');
+
+            // Prevent body scroll when menu is open
+            if (nav.classList.contains('active')) {
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = '';
+            }
+        }
+
+        // Close menu when clicking on a link (on mobile)
+        document.addEventListener('DOMContentLoaded', function() {
+            const nav = document.getElementById('mobile-nav');
+            if (nav) {
+                const links = nav.querySelectorAll('a');
+                links.forEach(link => {
+                    link.addEventListener('click', function() {
+                        // Check if mobile menu is active
+                        if (nav.classList.contains('active')) {
+                            toggleMobileMenu();
+                        }
+                    });
+                });
+            }
+        });
+    </script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/service-worker.js')
+                    .then((registration) => {
+                        console.log('✓ Service Worker registered successfully:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        // Install prompt
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+
+            // Show install button (can be customized later)
+            console.log('✓ PWA install prompt available');
+
+            // Optionally show custom install button
+            // Example: document.getElementById('install-button').style.display = 'block';
+        });
+
+        // Track installation
+        window.addEventListener('appinstalled', () => {
+            console.log('✓ Privra Mail PWA installed');
+            deferredPrompt = null;
+        });
+    </script>
 </body>
 </html>

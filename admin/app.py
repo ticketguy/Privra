@@ -253,6 +253,293 @@ def passwd(email):
 
     return render_template_string(PASSWD_TEMPLATE, email=email)
 
+@app.route('/consent/<email>', methods=['GET', 'POST'])
+@login_required
+def consent_settings(email):
+    """Manage consent settings for a user"""
+    if request.method == 'POST':
+        require_consent = request.form.get('require_consent') == 'on'
+        require_payment = request.form.get('require_payment') == 'on'
+        whitelist_mode = request.form.get('whitelist_mode') == 'on'
+        payment_amount = int(request.form.get('payment_amount_sats', 1000))
+
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+
+            # Upsert consent settings
+            cur.execute("""
+                INSERT INTO consent_settings
+                (user_email, require_consent, require_payment, whitelist_mode, payment_amount_sats, updated_at)
+                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_email)
+                DO UPDATE SET
+                    require_consent = %s,
+                    require_payment = %s,
+                    whitelist_mode = %s,
+                    payment_amount_sats = %s,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (email, require_consent, require_payment, whitelist_mode, payment_amount,
+                  require_consent, require_payment, whitelist_mode, payment_amount))
+
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            flash(f'Consent settings updated for {email}!', 'success')
+            return redirect(url_for('consent_settings', email=email))
+        except Exception as e:
+            flash(f'Error: {str(e)}', 'error')
+
+    # Get current settings
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Get user
+        cur.execute("SELECT email, active FROM users WHERE email = %s", (email,))
+        user = cur.fetchone()
+
+        if not user:
+            flash(f'User {email} not found!', 'error')
+            return redirect(url_for('index'))
+
+        # Get consent settings
+        cur.execute("""
+            SELECT require_consent, require_payment, whitelist_mode, payment_amount_sats
+            FROM consent_settings WHERE user_email = %s
+        """, (email,))
+        settings = cur.fetchone()
+
+        # Get whitelist
+        cur.execute("""
+            SELECT sender_email, sender_domain, added_at
+            FROM sender_whitelist WHERE recipient_email = %s
+            ORDER BY added_at DESC
+        """, (email,))
+        whitelist = cur.fetchall()
+
+        # Get blacklist
+        cur.execute("""
+            SELECT sender_email, sender_domain, added_at
+            FROM sender_blacklist WHERE recipient_email = %s
+            ORDER BY added_at DESC
+        """, (email,))
+        blacklist = cur.fetchall()
+
+        cur.close()
+        conn.close()
+
+        return render_template_string(CONSENT_TEMPLATE,
+                                     email=email,
+                                     settings=settings,
+                                     whitelist=whitelist,
+                                     blacklist=blacklist)
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/consent/<email>/whitelist/add', methods=['POST'])
+@login_required
+def add_whitelist(email):
+    """Add sender to whitelist"""
+    sender_email = request.form.get('sender_email', '').strip()
+    sender_domain = request.form.get('sender_domain', '').strip()
+
+    if not sender_email and not sender_domain:
+        flash('Please provide either an email or domain', 'error')
+        return redirect(url_for('consent_settings', email=email))
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO sender_whitelist (recipient_email, sender_email, sender_domain)
+            VALUES (%s, %s, %s)
+        """, (email, sender_email if sender_email else None, sender_domain if sender_domain else None))
+        conn.commit()
+        cur.close()
+        conn.close()
+        flash('Added to whitelist!', 'success')
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'error')
+
+    return redirect(url_for('consent_settings', email=email))
+
+@app.route('/consent/<email>/blacklist/add', methods=['POST'])
+@login_required
+def add_blacklist(email):
+    """Add sender to blacklist"""
+    sender_email = request.form.get('sender_email', '').strip()
+    sender_domain = request.form.get('sender_domain', '').strip()
+
+    if not sender_email and not sender_domain:
+        flash('Please provide either an email or domain', 'error')
+        return redirect(url_for('consent_settings', email=email))
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO sender_blacklist (recipient_email, sender_email, sender_domain)
+            VALUES (%s, %s, %s)
+        """, (email, sender_email if sender_email else None, sender_domain if sender_domain else None))
+        conn.commit()
+        cur.close()
+        conn.close()
+        flash('Added to blacklist!', 'success')
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'error')
+
+    return redirect(url_for('consent_settings', email=email))
+
+# X402 Payment Routes (Public - no login required for AI agents)
+@app.route('/x402/pay/<token>', methods=['GET'])
+def x402_payment_page(token):
+    """Display X402 payment request page for AI agents and senders"""
+    try:
+        # Import X402 service
+        import sys
+        sys.path.append('/app')
+        sys.path.append('../postfix')
+        from x402_service import x402_service
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Get payment request details
+        cur.execute("""
+            SELECT pr.id, pr.sender_email, pr.recipient_email, pr.amount_usdc,
+                   pr.network, pr.payment_address, pr.asset_address, pr.expires_at, pr.status,
+                   cr.email_subject
+            FROM x402_payment_requests pr
+            JOIN consent_requests cr ON pr.consent_request_id = cr.id
+            WHERE pr.token = %s
+        """, (token,))
+
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if not result:
+            return jsonify({"error": "Payment request not found"}), 404
+
+        payment_id, sender, recipient, amount_usdc, network, pay_to, asset, expires_at, status, subject = result
+
+        # Check if already paid
+        if status == 'paid':
+            return render_template_string(X402_PAID_TEMPLATE, sender=sender, recipient=recipient)
+
+        # Check if expired
+        from datetime import datetime
+        if datetime.now() > expires_at:
+            return jsonify({"error": "Payment request expired"}), 410
+
+        # Build payment requirement
+        network_config = x402_service.NETWORKS.get(network, {})
+        amount_atomic = str(int(float(amount_usdc) * 1_000_000))
+
+        payment_requirement = {
+            "x402Version": 1,
+            "accepts": [
+                {
+                    "scheme": "exact",
+                    "network": network,
+                    "maxAmountRequired": amount_atomic,
+                    "resource": f"/x402/pay/{token}",
+                    "description": f"Email delivery to {recipient}",
+                    "mimeType": "application/json",
+                    "payTo": pay_to,
+                    "maxTimeoutSeconds": 3600,
+                    "asset": asset,
+                    "extra": {
+                        "sender": sender,
+                        "recipient": recipient,
+                        "token": token,
+                        "type": "email_consent"
+                    }
+                }
+            ],
+            "error": f"Payment required to send email to {recipient}"
+        }
+
+        # Return JSON for AI agents or HTML for browsers
+        if request.headers.get('Accept', '').startswith('application/json'):
+            return jsonify(payment_requirement), 402
+        else:
+            return render_template_string(
+                X402_PAYMENT_TEMPLATE,
+                sender=sender,
+                recipient=recipient,
+                amount_usdc=amount_usdc,
+                network=network,
+                network_name=network_config.get('name', network),
+                pay_to=pay_to,
+                token=token,
+                subject=subject,
+                payment_requirement=json.dumps(payment_requirement, indent=2)
+            )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/x402/verify/<token>', methods=['POST'])
+def x402_verify_payment(token):
+    """Verify X402 payment"""
+    try:
+        # Get payment header from request
+        payment_header = request.headers.get('X-PAYMENT')
+        if not payment_header:
+            # Try JSON body
+            data = request.get_json()
+            payment_header = data.get('paymentHeader') if data else None
+
+        if not payment_header:
+            return jsonify({"error": "Missing X-PAYMENT header"}), 400
+
+        # Import X402 service
+        import sys
+        sys.path.append('/app')
+        sys.path.append('../postfix')
+        from x402_service import x402_service
+
+        # Verify payment
+        is_valid, error = x402_service.verify_payment(token, payment_header)
+
+        if is_valid:
+            return jsonify({
+                "success": True,
+                "message": "Payment verified. Email will be delivered."
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "error": error or "Payment verification failed"
+            }), 400
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/x402/status/<token>', methods=['GET'])
+def x402_payment_status(token):
+    """Check X402 payment status"""
+    try:
+        # Import X402 service
+        import sys
+        sys.path.append('/app')
+        sys.path.append('../postfix')
+        from x402_service import x402_service
+
+        status = x402_service.check_payment_status(token)
+
+        if status is None:
+            return jsonify({"error": "Payment request not found"}), 404
+
+        return jsonify({"status": status}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # HTML Templates
 LOGIN_TEMPLATE = '''
 <!DOCTYPE html>
@@ -361,6 +648,7 @@ INDEX_TEMPLATE = '''
                     <td>{{ user[2].strftime('%Y-%m-%d %H:%M') }}</td>
                     <td>
                         <a href="{{ url_for('passwd', email=user[0]) }}" class="btn btn-primary">Change Password</a>
+                        <a href="{{ url_for('consent_settings', email=user[0]) }}" class="btn btn-primary">Consent Settings</a>
                         <form method="POST" action="{{ url_for('deluser', email=user[0]) }}" style="display: inline;">
                             <button type="submit" class="btn btn-danger" onclick="return confirm('Delete {{ user[0] }}?')">Delete</button>
                         </form>
@@ -509,6 +797,289 @@ RECOVERY_KEY_TEMPLATE = '''
         });
     }
     </script>
+</body>
+</html>
+'''
+
+CONSENT_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Consent Settings - {{ email }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; }
+        .header { background: white; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        h2 { margin-bottom: 20px; color: #333; }
+        h3 { margin: 25px 0 15px 0; color: #555; font-size: 18px; }
+        .back { display: inline-block; margin-bottom: 20px; color: #007bff; text-decoration: none; }
+        input[type="checkbox"] { margin-right: 8px; width: auto; }
+        input[type="number"], input[type="text"] { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px; }
+        label { display: block; margin: 12px 0; font-size: 14px; }
+        button { padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        button:hover { background: #0056b3; }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .flash { padding: 12px; margin: 15px 0; border-radius: 4px; }
+        .flash.error { background: #fee; color: #c33; border: 1px solid #fcc; }
+        .flash.success { background: #efe; color: #3c3; border: 1px solid #cfc; }
+        .section { background: #f8f9fa; padding: 20px; border-radius: 6px; margin: 20px 0; }
+        .info-box { background: #e7f3ff; border-left: 4px solid #007bff; padding: 12px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📧 Privra Mail Admin</h1>
+    </div>
+    <div class="container">
+        <a href="{{ url_for('index') }}" class="back">← Back to Users</a>
+        <h2>Consent & Pay-to-Send Settings for {{ email }}</h2>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="info-box">
+            <strong>Phase 5: Pay-to-Send Economic Layer</strong><br>
+            Control who can send emails to this user. Configure consent requirements, payment settings, and whitelist/blacklist.
+        </div>
+
+        <form method="POST" class="section">
+            <h3>Consent Settings</h3>
+
+            <label>
+                <input type="checkbox" name="require_consent" {% if settings and settings[0] %}checked{% endif %}>
+                Require consent from unknown senders
+            </label>
+
+            <label>
+                <input type="checkbox" name="require_payment" {% if settings and settings[1] %}checked{% endif %}>
+                Require payment for consent
+            </label>
+
+            <label>
+                <input type="checkbox" name="whitelist_mode" {% if settings and settings[2] %}checked{% endif %}>
+                Whitelist mode (only allow whitelisted senders)
+            </label>
+
+            <label>
+                Payment amount (satoshis):
+                <input type="number" name="payment_amount_sats" value="{{ settings[3] if settings else 1000 }}" min="1">
+            </label>
+
+            <button type="submit">Save Settings</button>
+        </form>
+
+        <h3>Whitelist (Allowed Senders)</h3>
+        <div class="section">
+            <form method="POST" action="{{ url_for('add_whitelist', email=email) }}" style="margin-bottom: 20px;">
+                <label>
+                    Sender Email:
+                    <input type="text" name="sender_email" placeholder="sender@example.com">
+                </label>
+                <label>
+                    OR Sender Domain:
+                    <input type="text" name="sender_domain" placeholder="example.com">
+                </label>
+                <button type="submit" class="btn-success">Add to Whitelist</button>
+            </form>
+
+            {% if whitelist %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Domain</th>
+                        <th>Added</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in whitelist %}
+                    <tr>
+                        <td>{{ entry[0] or '-' }}</td>
+                        <td>{{ entry[1] or '-' }}</td>
+                        <td>{{ entry[2].strftime('%Y-%m-%d %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: #666; font-style: italic;">No entries in whitelist</p>
+            {% endif %}
+        </div>
+
+        <h3>Blacklist (Blocked Senders)</h3>
+        <div class="section">
+            <form method="POST" action="{{ url_for('add_blacklist', email=email) }}" style="margin-bottom: 20px;">
+                <label>
+                    Sender Email:
+                    <input type="text" name="sender_email" placeholder="spammer@example.com">
+                </label>
+                <label>
+                    OR Sender Domain:
+                    <input type="text" name="sender_domain" placeholder="spam.com">
+                </label>
+                <button type="submit" class="btn-success">Add to Blacklist</button>
+            </form>
+
+            {% if blacklist %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Domain</th>
+                        <th>Added</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in blacklist %}
+                    <tr>
+                        <td>{{ entry[0] or '-' }}</td>
+                        <td>{{ entry[1] or '-' }}</td>
+                        <td>{{ entry[2].strftime('%Y-%m-%d %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: #666; font-style: italic;">No entries in blacklist</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+X402_PAYMENT_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payment Required - X402</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .container { max-width: 700px; margin: 20px; background: white; padding: 40px; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
+        h2 { color: #667eea; margin: 30px 0 15px 0; font-size: 20px; }
+        .status-code { background: #667eea; color: white; padding: 8px 16px; border-radius: 6px; display: inline-block; font-weight: bold; margin-bottom: 20px; }
+        .info-box { background: #f8f9fa; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .info-box strong { color: #667eea; }
+        .payment-details { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .payment-details div { margin: 10px 0; display: flex; justify-content: space-between; }
+        .payment-details .label { color: #666; font-weight: 600; }
+        .payment-details .value { color: #333; font-family: monospace; word-break: break-all; }
+        .code-block { background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 8px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 12px; margin: 15px 0; }
+        .btn { display: inline-block; padding: 14px 28px; background: #667eea; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.3s; border: none; cursor: pointer; }
+        .btn:hover { background: #5568d3; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+        .network-badge { background: #28a745; color: white; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-left: 10px; }
+        .warning { background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 6px; margin: 20px 0; color: #856404; }
+        .ai-agent-note { background: #e7f3ff; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ Payment Required</h1>
+        <div class="status-code">HTTP 402</div>
+
+        <div class="info-box">
+            <strong>From:</strong> {{ sender }}<br>
+            <strong>To:</strong> {{ recipient }}<br>
+            <strong>Subject:</strong> {{ subject }}
+        </div>
+
+        <p style="margin: 20px 0; color: #666; line-height: 1.6;">
+            This recipient requires payment for email delivery from unauthorized senders.
+            This helps prevent spam and ensures only serious senders reach the inbox.
+        </p>
+
+        <h2>💰 Payment Details</h2>
+        <div class="payment-details">
+            <div>
+                <span class="label">Amount:</span>
+                <span class="value">${{ amount_usdc }} USDC</span>
+            </div>
+            <div>
+                <span class="label">Network:</span>
+                <span class="value">{{ network_name }} <span class="network-badge">{{ network }}</span></span>
+            </div>
+            <div>
+                <span class="label">Payment Address:</span>
+                <span class="value">{{ pay_to }}</span>
+            </div>
+        </div>
+
+        <div class="ai-agent-note">
+            <strong>🤖 AI Agents:</strong> Use the X402 protocol to pay programmatically.
+            Send USDC on {{ network_name }} to the address above, then submit the payment proof via the X-PAYMENT header.
+        </div>
+
+        <h2>📝 X402 Payment Requirement</h2>
+        <div class="code-block">{{ payment_requirement }}</div>
+
+        <h2>🔗 How to Pay</h2>
+        <div style="margin: 20px 0;">
+            <ol style="margin-left: 20px; line-height: 1.8;">
+                <li>Send <strong>${{ amount_usdc }} USDC</strong> to the payment address above on <strong>{{ network_name }}</strong></li>
+                <li>Get your transaction hash/signature</li>
+                <li>Submit payment proof via POST to <code>/x402/verify/{{ token }}</code></li>
+                <li>Your email will be automatically delivered once payment is verified</li>
+            </ol>
+        </div>
+
+        <div class="warning">
+            <strong>⏰ Note:</strong> This payment request expires in 1 hour.
+            Once paid, the sender will be approved and can send emails without future payments.
+        </div>
+
+        <div style="margin-top: 30px; text-align: center;">
+            <p style="color: #666; font-size: 14px;">
+                Powered by <strong>X402 Protocol</strong> • Privra Mail Server<br>
+                <a href="https://x402.org" style="color: #667eea;">Learn more about X402</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+X402_PAID_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payment Confirmed - X402</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .container { max-width: 600px; margin: 20px; background: white; padding: 50px; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center; }
+        h1 { color: #11998e; margin-bottom: 20px; font-size: 32px; }
+        .checkmark { font-size: 80px; color: #38ef7d; margin-bottom: 20px; }
+        p { color: #666; line-height: 1.6; margin: 15px 0; }
+        .email-info { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 30px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="checkmark">✓</div>
+        <h1>Payment Confirmed!</h1>
+        <p>Your payment has been verified and your email will be delivered shortly.</p>
+
+        <div class="email-info">
+            <strong>From:</strong> {{ sender }}<br>
+            <strong>To:</strong> {{ recipient }}
+        </div>
+
+        <p style="font-size: 14px; color: #999;">
+            You are now approved to send emails to this recipient. Future emails will be delivered without payment.
+        </p>
+    </div>
 </body>
 </html>
 '''
