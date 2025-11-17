@@ -1569,5 +1569,194 @@ def unlabel_email(message_id):
         print(f"Error unlabeling email: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# ============================================
+# RPC Configuration Routes
+# ============================================
+
+@app.route('/settings/rpc')
+def rpc_settings():
+    """User RPC configuration page"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Check if user is admin
+    cur.execute("SELECT is_admin FROM users WHERE email = %s", (session['email'],))
+    is_admin = cur.fetchone()
+    is_admin = is_admin[0] if is_admin else False
+
+    # Get user's RPC config or create default
+    cur.execute("""
+        SELECT use_custom_rpc, solana_rpc_url, ethereum_rpc_url,
+               base_rpc_url, polygon_rpc_url, arbitrum_rpc_url, optimism_rpc_url
+        FROM user_rpc_config
+        WHERE user_email = %s
+    """, (session['email'],))
+
+    user_config = cur.fetchone()
+
+    if not user_config:
+        # Create default config
+        cur.execute("""
+            INSERT INTO user_rpc_config (user_email, use_custom_rpc)
+            VALUES (%s, FALSE)
+            RETURNING use_custom_rpc, solana_rpc_url, ethereum_rpc_url,
+                      base_rpc_url, polygon_rpc_url, arbitrum_rpc_url, optimism_rpc_url
+        """, (session['email'],))
+        user_config = cur.fetchone()
+        conn.commit()
+
+    # Get global defaults for reference
+    cur.execute("""
+        SELECT solana_rpc_url, ethereum_rpc_url, base_rpc_url,
+               polygon_rpc_url, arbitrum_rpc_url, optimism_rpc_url
+        FROM global_rpc_config
+        WHERE is_active = TRUE
+        LIMIT 1
+    """)
+
+    global_config = cur.fetchone()
+
+    return render_template('rpc_settings.html',
+                         is_admin=is_admin,
+                         use_custom=user_config[0] if user_config else False,
+                         user_config={
+                             'solana': user_config[1] if user_config else '',
+                             'ethereum': user_config[2] if user_config else '',
+                             'base': user_config[3] if user_config else '',
+                             'polygon': user_config[4] if user_config else '',
+                             'arbitrum': user_config[5] if user_config else '',
+                             'optimism': user_config[6] if user_config else ''
+                         },
+                         global_config={
+                             'solana': global_config[0] if global_config else '',
+                             'ethereum': global_config[1] if global_config else '',
+                             'base': global_config[2] if global_config else '',
+                             'polygon': global_config[3] if global_config else '',
+                             'arbitrum': global_config[4] if global_config else '',
+                             'optimism': global_config[5] if global_config else ''
+                         })
+
+@app.route('/settings/rpc/save', methods=['POST'])
+def save_rpc_settings():
+    """Save user RPC configuration"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    use_custom = request.form.get('use_custom_rpc') == 'true'
+    solana_rpc = request.form.get('solana_rpc', '').strip()
+    ethereum_rpc = request.form.get('ethereum_rpc', '').strip()
+    base_rpc = request.form.get('base_rpc', '').strip()
+    polygon_rpc = request.form.get('polygon_rpc', '').strip()
+    arbitrum_rpc = request.form.get('arbitrum_rpc', '').strip()
+    optimism_rpc = request.form.get('optimism_rpc', '').strip()
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Update or insert user config
+        cur.execute("""
+            INSERT INTO user_rpc_config (
+                user_email, use_custom_rpc, solana_rpc_url, ethereum_rpc_url,
+                base_rpc_url, polygon_rpc_url, arbitrum_rpc_url, optimism_rpc_url,
+                updated_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (user_email) DO UPDATE SET
+                use_custom_rpc = EXCLUDED.use_custom_rpc,
+                solana_rpc_url = EXCLUDED.solana_rpc_url,
+                ethereum_rpc_url = EXCLUDED.ethereum_rpc_url,
+                base_rpc_url = EXCLUDED.base_rpc_url,
+                polygon_rpc_url = EXCLUDED.polygon_rpc_url,
+                arbitrum_rpc_url = EXCLUDED.arbitrum_rpc_url,
+                optimism_rpc_url = EXCLUDED.optimism_rpc_url,
+                updated_at = NOW()
+        """, (session['email'], use_custom, solana_rpc or None, ethereum_rpc or None,
+              base_rpc or None, polygon_rpc or None, arbitrum_rpc or None, optimism_rpc or None))
+
+        conn.commit()
+        return jsonify({'success': True, 'message': 'RPC settings saved successfully'})
+
+    except Exception as e:
+        print(f"Error saving RPC settings: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/rpc')
+def admin_rpc_settings():
+    """Admin RPC configuration page"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    # Check if user is admin
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT is_admin FROM users WHERE email = %s", (session['email'],))
+    result = cur.fetchone()
+
+    if not result or not result[0]:
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('inbox'))
+
+    # Get current global RPC config
+    cur.execute("""
+        SELECT id, config_name, solana_rpc_url, ethereum_rpc_url,
+               base_rpc_url, polygon_rpc_url, arbitrum_rpc_url, optimism_rpc_url,
+               is_active
+        FROM global_rpc_config
+        ORDER BY is_active DESC, config_name
+    """)
+
+    configs = cur.fetchall()
+
+    return render_template('admin_rpc.html', configs=configs)
+
+@app.route('/admin/rpc/save', methods=['POST'])
+def save_admin_rpc_settings():
+    """Save global RPC configuration (admin only)"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    # Check if user is admin
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT is_admin FROM users WHERE email = %s", (session['email'],))
+    result = cur.fetchone()
+
+    if not result or not result[0]:
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+
+    config_id = request.form.get('config_id')
+    solana_rpc = request.form.get('solana_rpc', '').strip()
+    ethereum_rpc = request.form.get('ethereum_rpc', '').strip()
+    base_rpc = request.form.get('base_rpc', '').strip()
+    polygon_rpc = request.form.get('polygon_rpc', '').strip()
+    arbitrum_rpc = request.form.get('arbitrum_rpc', '').strip()
+    optimism_rpc = request.form.get('optimism_rpc', '').strip()
+
+    try:
+        if config_id:
+            # Update existing config
+            cur.execute("""
+                UPDATE global_rpc_config SET
+                    solana_rpc_url = %s,
+                    ethereum_rpc_url = %s,
+                    base_rpc_url = %s,
+                    polygon_rpc_url = %s,
+                    arbitrum_rpc_url = %s,
+                    optimism_rpc_url = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+            """, (solana_rpc, ethereum_rpc, base_rpc, polygon_rpc,
+                  arbitrum_rpc, optimism_rpc, config_id))
+
+        conn.commit()
+        return jsonify({'success': True, 'message': 'Global RPC settings updated'})
+
+    except Exception as e:
+        print(f"Error saving admin RPC settings: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
