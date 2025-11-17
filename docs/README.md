@@ -16,6 +16,7 @@ One command deploys everything! For details, see [Deployment Guide](deployment/D
 - [Encryption Architecture](architecture/ENCRYPTION_ARCHITECTURE.md) - End-to-end encryption system design
 - [PortID Integration](architecture/PORTID_ANALYSIS.md) - PortID authentication system
 - [What is PortID](architecture/WHAT_IS_PORTID.md) - Overview of PortID
+- [Reputation System](REPUTATION_SYSTEM.md) - Automated abuse prevention and trust scores
 
 ### Deployment
 - [Deployment Guide](deployment/DEPLOY.md) - Complete deployment instructions

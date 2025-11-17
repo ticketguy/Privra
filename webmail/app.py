@@ -564,6 +564,53 @@ def view_email(email_id):
         mail.logout()
         return redirect(url_for('inbox'))
 
+@app.route('/report/abuse', methods=['POST'])
+def report_abuse():
+    """Report email as spam/abuse"""
+    if 'email' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        from reputation_service import reputation_service
+
+        reported_email = request.form.get('reported_email')
+        reason = request.form.get('reason', 'spam')
+        details = request.form.get('details', '')
+
+        if not reported_email:
+            return jsonify({'error': 'No email address provided'}), 400
+
+        result = reputation_service.process_user_report(
+            reporter_email=session['email'],
+            reported_email=reported_email,
+            reason=reason,
+            details=details
+        )
+
+        if result.get('success'):
+            flash(f'Report submitted. Thank you for keeping Privra safe.', 'success')
+            return jsonify({'success': True, 'message': 'Report submitted'})
+        else:
+            return jsonify({'success': False, 'error': result.get('error', 'Failed to submit report')}), 400
+
+    except Exception as e:
+        print(f"Report abuse error: {e}")
+        return jsonify({'error': 'Failed to submit report'}), 500
+
+@app.route('/reputation/check')
+def check_reputation():
+    """Check own reputation (for dashboard)"""
+    if 'email' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        from reputation_service import reputation_service
+        rep = reputation_service.get_user_reputation(session['email'])
+        return jsonify(rep)
+    except Exception as e:
+        print(f"Check reputation error: {e}")
+        return jsonify({'error': 'Failed to check reputation'}), 500
+
 @app.route('/compose', methods=['GET', 'POST'])
 def compose():
     """Compose and send email"""

@@ -28,6 +28,9 @@ Your mail server is ready in 5 minutes.
 - ✅ **Simple Admin** - Web interface to manage users
 - ✅ **PostgreSQL** - Reliable user database
 - ✅ **LMTP Delivery** - Modern, reliable mail delivery
+- ✅ **Reputation System** - Automated abuse prevention with trust scores
+- ✅ **End-to-End Encryption** - Client-side email encryption
+- ✅ **Consent Management** - Control who can email you
 
 ## Access
 
