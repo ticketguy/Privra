@@ -101,6 +101,104 @@ def decode_mime_words(s):
             fragments.append(fragment)
     return ''.join(fragments)
 
+def get_sender_verification(email_addr):
+    """Get verification status for a sender"""
+    try:
+        # Extract just email if it has name (e.g., "Name <email@domain.com>")
+        if '<' in email_addr and '>' in email_addr:
+            email_addr = email_addr.split('<')[1].split('>')[0].strip()
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Check user profile for verification
+        cur.execute("""
+            SELECT
+                up.is_verified,
+                up.verification_method,
+                up.nft_badge_mint,
+                up.display_name,
+                up.avatar_url,
+                rs.reputation_level,
+                rs.total_score
+            FROM user_profiles up
+            LEFT JOIN reputation_scores rs ON up.user_email = rs.user_email
+            WHERE up.user_email = %s
+        """, (email_addr,))
+
+        result = cur.fetchone()
+
+        # Check domain verification
+        cur.execute("""
+            SELECT domain, verified
+            FROM domain_verifications
+            WHERE user_email = %s AND verified = TRUE
+            LIMIT 1
+        """, (email_addr,))
+
+        domain_verified = cur.fetchone()
+
+        cur.close()
+        conn.close()
+
+        if not result:
+            return {
+                'verified': False,
+                'method': None,
+                'reputation_level': 'new',
+                'score': 0,
+                'display_name': None,
+                'avatar_url': None,
+                'badges': []
+            }
+
+        is_verified, method, nft_mint, display_name, avatar_url, rep_level, score = result
+
+        # Determine badges
+        badges = []
+        if is_verified:
+            if method == 'nft' and nft_mint:
+                badges.append({'type': 'nft', 'text': 'NFT Verified', 'icon': '🖼️', 'color': '#8b5cf6'})
+            if domain_verified:
+                badges.append({'type': 'domain', 'text': f'Domain: {domain_verified[0]}', 'icon': '✅', 'color': '#10b981'})
+
+        # Reputation badge
+        if rep_level and rep_level != 'new':
+            rep_colors = {
+                'trusted': '#3b82f6',
+                'verified': '#10b981',
+                'elite': '#f59e0b',
+                'legendary': '#dc2626'
+            }
+            badges.append({
+                'type': 'reputation',
+                'text': rep_level.capitalize(),
+                'icon': '⭐',
+                'color': rep_colors.get(rep_level, '#6b7280')
+            })
+
+        return {
+            'verified': is_verified or bool(domain_verified),
+            'method': method,
+            'reputation_level': rep_level or 'new',
+            'score': score or 0,
+            'display_name': display_name,
+            'avatar_url': avatar_url,
+            'badges': badges
+        }
+
+    except Exception as e:
+        print(f"Error checking verification: {e}")
+        return {
+            'verified': False,
+            'method': None,
+            'reputation_level': 'new',
+            'score': 0,
+            'display_name': None,
+            'avatar_url': None,
+            'badges': []
+        }
+
 def get_email_body(msg):
     """Extract email body from message"""
     body = ""
@@ -561,13 +659,17 @@ def inbox():
                 except:
                     date = datetime.now()
 
+                # Get sender verification info
+                verification = get_sender_verification(from_addr)
+
                 emails.append({
                     'id': email_id.decode(),
                     'subject': subject,
                     'from': from_addr,
                     'date': date.strftime('%Y-%m-%d %H:%M'),
                     'category': category,
-                    'category_name': category_name
+                    'category_name': category_name,
+                    'verification': verification
                 })
             except Exception as e:
                 print(f"Error parsing email {email_id}: {e}")
@@ -620,6 +722,9 @@ def view_email(email_id):
         except:
             date_formatted = date_str
 
+        # Get sender verification info
+        verification = get_sender_verification(from_addr)
+
         mail.logout()
 
         return render_template('view_email.html',
@@ -628,7 +733,8 @@ def view_email(email_id):
                              to_addr=to_addr,
                              date=date_formatted,
                              body=body,
-                             is_encrypted=is_encrypted)
+                             is_encrypted=is_encrypted,
+                             verification=verification)
 
     except Exception as e:
         print(f"View email error: {e}")
