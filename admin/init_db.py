@@ -97,66 +97,6 @@ def init_database():
         )
     """)
 
-    # Create consent_settings table (required for user registration)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS consent_settings (
-            user_email VARCHAR(255) PRIMARY KEY,
-            require_consent BOOLEAN DEFAULT FALSE,
-            require_payment BOOLEAN DEFAULT FALSE,
-            payment_amount DECIMAL(10, 2) DEFAULT 0.00,
-            payment_address VARCHAR(500),
-            whitelist_mode BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_email) REFERENCES users(email) ON DELETE CASCADE
-        )
-    """)
-
-    # Create sender_whitelist table
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS sender_whitelist (
-            id SERIAL PRIMARY KEY,
-            recipient_email VARCHAR(255) NOT NULL,
-            sender_email VARCHAR(255) NOT NULL,
-            sender_domain VARCHAR(255),
-            note TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (recipient_email) REFERENCES users(email) ON DELETE CASCADE,
-            UNIQUE(recipient_email, sender_email)
-        )
-    """)
-
-    # Create sender_blacklist table
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS sender_blacklist (
-            id SERIAL PRIMARY KEY,
-            recipient_email VARCHAR(255) NOT NULL,
-            sender_email VARCHAR(255),
-            sender_domain VARCHAR(255),
-            reason TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (recipient_email) REFERENCES users(email) ON DELETE CASCADE
-        )
-    """)
-
-    # Create consent_requests table
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS consent_requests (
-            id SERIAL PRIMARY KEY,
-            recipient_email VARCHAR(255) NOT NULL,
-            sender_email VARCHAR(255) NOT NULL,
-            token VARCHAR(100) UNIQUE NOT NULL,
-            status VARCHAR(20) DEFAULT 'pending',
-            email_subject TEXT,
-            email_preview TEXT,
-            payment_txid VARCHAR(100),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            expires_at TIMESTAMP,
-            responded_at TIMESTAMP,
-            FOREIGN KEY (recipient_email) REFERENCES users(email) ON DELETE CASCADE
-        )
-    """)
-
     # Insert default domain
     domain = os.getenv('MAIL_DOMAIN', 'privra.xyz')
     cur.execute(
@@ -164,7 +104,7 @@ def init_database():
         (domain,)
     )
 
-    # Create consent settings table (Phase 5)
+    # Create consent settings table (Phase 5) - Merged version
     cur.execute("""
         CREATE TABLE IF NOT EXISTS consent_settings (
             id SERIAL PRIMARY KEY,
@@ -173,38 +113,41 @@ def init_database():
             require_payment BOOLEAN DEFAULT FALSE,
             whitelist_mode BOOLEAN DEFAULT FALSE,
             payment_amount_sats INTEGER DEFAULT 1000,
+            payment_address VARCHAR(500),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
-    # Create sender whitelist table (Phase 5)
+    # Create sender whitelist table (Phase 5) - Merged version
     cur.execute("""
         CREATE TABLE IF NOT EXISTS sender_whitelist (
             id SERIAL PRIMARY KEY,
             recipient_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
             sender_email VARCHAR(255),
             sender_domain VARCHAR(255),
+            note TEXT,
             added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(recipient_email, sender_email),
             UNIQUE(recipient_email, sender_domain)
         )
     """)
 
-    # Create sender blacklist table (Phase 5)
+    # Create sender blacklist table (Phase 5) - Merged version
     cur.execute("""
         CREATE TABLE IF NOT EXISTS sender_blacklist (
             id SERIAL PRIMARY KEY,
             recipient_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
             sender_email VARCHAR(255),
             sender_domain VARCHAR(255),
+            reason TEXT,
             added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(recipient_email, sender_email),
             UNIQUE(recipient_email, sender_domain)
         )
     """)
 
-    # Create consent requests table (Phase 5)
+    # Create consent requests table (Phase 5) - Merged version
     cur.execute("""
         CREATE TABLE IF NOT EXISTS consent_requests (
             id SERIAL PRIMARY KEY,
@@ -212,13 +155,15 @@ def init_database():
             sender_email VARCHAR(255) NOT NULL,
             token VARCHAR(255) UNIQUE NOT NULL,
             email_subject TEXT,
+            email_preview TEXT,
             status VARCHAR(20) DEFAULT 'pending',
             payment_received BOOLEAN DEFAULT FALSE,
             payment_txid VARCHAR(255),
             expires_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             approved_at TIMESTAMP,
-            rejected_at TIMESTAMP
+            rejected_at TIMESTAMP,
+            responded_at TIMESTAMP
         )
     """)
 
@@ -479,6 +424,106 @@ def init_database():
             ai_generated BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(message_id, user_email, label_name)
+        )
+    """)
+
+    # ========== ABUSE PREVENTION SYSTEM TABLES ==========
+
+    # User reputation tracking (abuse prevention)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_reputation (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) UNIQUE NOT NULL,
+            current_score INTEGER DEFAULT 100 CHECK (current_score >= 0 AND current_score <= 100),
+            tier VARCHAR(20) DEFAULT 'normal' CHECK (tier IN ('normal', 'warning', 'throttle', 'walled', 'frozen')),
+            is_frozen BOOLEAN DEFAULT FALSE,
+            last_violation_at TIMESTAMP,
+            last_score_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            total_reports_received INTEGER DEFAULT 0,
+            total_reports_filed INTEGER DEFAULT 0,
+            false_report_count INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # User abuse reports (spam/abuse reports)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS abuse_reports (
+            id SERIAL PRIMARY KEY,
+            reporter_email VARCHAR(255) NOT NULL,
+            reported_email VARCHAR(255) NOT NULL,
+            reporter_score INTEGER,
+            impact_multiplier DECIMAL(3,2),
+            score_penalty INTEGER,
+            reason VARCHAR(100),
+            details TEXT,
+            email_subject VARCHAR(500),
+            email_date TIMESTAMP,
+            status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processed', 'dismissed', 'false_report')),
+            processed_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            report_date DATE DEFAULT CURRENT_DATE,
+            UNIQUE(reporter_email, reported_email, report_date)
+        )
+    """)
+
+    # Bounce tracking
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS bounce_tracking (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) NOT NULL,
+            recipient_email VARCHAR(255) NOT NULL,
+            bounce_type VARCHAR(50),
+            bounce_reason TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Spam trap hits (honeypot addresses)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS spam_trap_hits (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) NOT NULL,
+            trap_address VARCHAR(255) NOT NULL,
+            email_subject VARCHAR(500),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Sending velocity violations
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS velocity_violations (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) NOT NULL,
+            emails_sent INTEGER NOT NULL,
+            time_window INTEGER NOT NULL,
+            threshold_exceeded BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Penalty notifications log
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS penalty_notifications (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) NOT NULL,
+            notification_type VARCHAR(50) NOT NULL,
+            tier VARCHAR(20) NOT NULL,
+            score INTEGER NOT NULL,
+            message TEXT,
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Spam trap addresses (honeypots)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS spam_traps (
+            id SERIAL PRIMARY KEY,
+            trap_email VARCHAR(255) UNIQUE NOT NULL,
+            trap_type VARCHAR(50) DEFAULT 'honeypot',
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
