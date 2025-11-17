@@ -23,6 +23,10 @@ from Crypto.Random import get_random_bytes
 import bcrypt
 from email_categorizer import EmailCategorizer
 from werkzeug.middleware.proxy_fix import ProxyFix
+import sys
+sys.path.append('/app')
+from nft_verification_service import nft_service
+from reputation_service import reputation_service
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -877,6 +881,283 @@ def account_settings():
         print(f"Error loading account settings: {e}")
         flash('Error loading account settings', 'error')
         return redirect(url_for('dashboard'))
+
+@app.route('/profile', methods=['GET', 'POST'])
+def profile():
+    """User profile management"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    user_email = session['email']
+
+    if request.method == 'POST':
+        # Update profile
+        display_name = request.form.get('display_name', '').strip()
+        bio = request.form.get('bio', '').strip()
+        profile_type = request.form.get('profile_type', 'individual')
+        org_name = request.form.get('org_name', '').strip() if profile_type == 'organization' else None
+        org_domain = request.form.get('org_domain', '').strip() if profile_type == 'organization' else None
+
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+
+            # Upsert user profile
+            cur.execute("""
+                INSERT INTO user_profiles
+                (user_email, display_name, bio, profile_type, organization_name, organization_domain)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (user_email)
+                DO UPDATE SET
+                    display_name = EXCLUDED.display_name,
+                    bio = EXCLUDED.bio,
+                    profile_type = EXCLUDED.profile_type,
+                    organization_name = EXCLUDED.organization_name,
+                    organization_domain = EXCLUDED.organization_domain,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (user_email, display_name, bio, profile_type, org_name, org_domain))
+
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            flash('Profile updated successfully!', 'success')
+        except Exception as e:
+            print(f"Error updating profile: {e}")
+            flash('Error updating profile', 'error')
+
+        return redirect(url_for('profile'))
+
+    # Get profile data
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Get user profile
+        cur.execute("""
+            SELECT display_name, bio, avatar_url, profile_type, organization_name,
+                   organization_domain, is_verified, verification_method, nft_badge_mint
+            FROM user_profiles
+            WHERE user_email = %s
+        """, (user_email,))
+        profile = cur.fetchone()
+
+        # Get wallets
+        cur.execute("""
+            SELECT id, wallet_address, wallet_type, is_primary, is_verified, created_at
+            FROM user_wallets
+            WHERE user_email = %s
+            ORDER BY is_primary DESC, created_at DESC
+        """, (user_email,))
+        wallets = cur.fetchall()
+
+        # Get reputation
+        reputation = reputation_service.get_reputation(user_email)
+        trust_percentage = reputation_service.calculate_trust_percentage(user_email)
+
+        # Get domain verifications
+        cur.execute("""
+            SELECT domain, verification_token, verified, verified_at
+            FROM domain_verifications
+            WHERE user_email = %s
+            ORDER BY created_at DESC
+        """, (user_email,))
+        domains = cur.fetchall()
+
+        cur.close()
+        conn.close()
+
+        profile_data = None
+        if profile:
+            profile_data = {
+                'display_name': profile[0],
+                'bio': profile[1],
+                'avatar_url': profile[2],
+                'profile_type': profile[3] or 'individual',
+                'organization_name': profile[4],
+                'organization_domain': profile[5],
+                'is_verified': profile[6],
+                'verification_method': profile[7],
+                'nft_badge_mint': profile[8]
+            }
+
+        return render_template('profile.html',
+                             profile=profile_data,
+                             wallets=wallets,
+                             reputation=reputation,
+                             trust_percentage=trust_percentage,
+                             domains=domains)
+
+    except Exception as e:
+        print(f"Error loading profile: {e}")
+        flash('Error loading profile', 'error')
+        return redirect(url_for('dashboard'))
+
+@app.route('/profile/wallet/add', methods=['POST'])
+def add_wallet():
+    """Add wallet to user profile"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    wallet_address = request.form.get('wallet_address', '').strip()
+    wallet_type = request.form.get('wallet_type', 'solana')
+
+    if not wallet_address:
+        flash('Wallet address is required', 'error')
+        return redirect(url_for('profile'))
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Check if this is the first wallet (make it primary)
+        cur.execute("""
+            SELECT COUNT(*) FROM user_wallets WHERE user_email = %s
+        """, (session['email'],))
+        wallet_count = cur.fetchone()[0]
+        is_primary = (wallet_count == 0)
+
+        # Insert wallet
+        cur.execute("""
+            INSERT INTO user_wallets (user_email, wallet_address, wallet_type, is_primary)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (user_email, wallet_address) DO NOTHING
+        """, (session['email'], wallet_address, wallet_type, is_primary))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash(f'Wallet {wallet_address[:8]}... added successfully!', 'success')
+    except Exception as e:
+        print(f"Error adding wallet: {e}")
+        flash('Error adding wallet', 'error')
+
+    return redirect(url_for('profile'))
+
+@app.route('/profile/wallet/remove/<int:wallet_id>', methods=['POST'])
+def remove_wallet(wallet_id):
+    """Remove wallet from user profile"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("""
+            DELETE FROM user_wallets
+            WHERE id = %s AND user_email = %s
+        """, (wallet_id, session['email']))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash('Wallet removed successfully!', 'success')
+    except Exception as e:
+        print(f"Error removing wallet: {e}")
+        flash('Error removing wallet', 'error')
+
+    return redirect(url_for('profile'))
+
+@app.route('/profile/verify-nft', methods=['POST'])
+def verify_nft():
+    """Set NFT as profile avatar"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    nft_mint = request.form.get('nft_mint', '').strip()
+    wallet_address = request.form.get('wallet_address', '').strip()
+
+    if not nft_mint or not wallet_address:
+        flash('NFT mint address and wallet address are required', 'error')
+        return redirect(url_for('profile'))
+
+    try:
+        # Set NFT as avatar
+        success, message = nft_service.set_nft_as_avatar(
+            session['email'],
+            nft_mint,
+            wallet_address
+        )
+
+        if success:
+            # Record reputation event
+            reputation_service.record_event(
+                session['email'],
+                'nft_verified',
+                'verification',
+                'NFT set as profile avatar',
+                {'nft_mint': nft_mint, 'wallet': wallet_address}
+            )
+            flash(message, 'success')
+        else:
+            flash(message, 'error')
+
+    except Exception as e:
+        print(f"Error verifying NFT: {e}")
+        flash('Error verifying NFT', 'error')
+
+    return redirect(url_for('profile'))
+
+@app.route('/profile/verify-domain/start', methods=['POST'])
+def start_domain_verification():
+    """Generate domain verification token"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    domain = request.form.get('domain', '').strip()
+
+    if not domain:
+        flash('Domain is required', 'error')
+        return redirect(url_for('profile'))
+
+    try:
+        # Generate verification token
+        token = nft_service.generate_domain_verification_token(session['email'], domain)
+
+        flash(f'Add this TXT record to {domain}: privra-verify={token}', 'success')
+    except Exception as e:
+        print(f"Error generating domain token: {e}")
+        flash('Error generating verification token', 'error')
+
+    return redirect(url_for('profile'))
+
+@app.route('/profile/verify-domain/check', methods=['POST'])
+def check_domain_verification():
+    """Verify domain ownership via DNS"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    domain = request.form.get('domain', '').strip()
+
+    if not domain:
+        flash('Domain is required', 'error')
+        return redirect(url_for('profile'))
+
+    try:
+        # Verify domain
+        success, message = nft_service.verify_domain_ownership(session['email'], domain)
+
+        if success:
+            # Record reputation event
+            reputation_service.record_event(
+                session['email'],
+                'domain_verified',
+                'verification',
+                f'Domain {domain} verified',
+                {'domain': domain}
+            )
+            flash(message, 'success')
+        else:
+            flash(message, 'error')
+
+    except Exception as e:
+        print(f"Error verifying domain: {e}")
+        flash('Error verifying domain', 'error')
+
+    return redirect(url_for('profile'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
