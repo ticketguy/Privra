@@ -10,21 +10,25 @@
         height: calc(100vh - 200px);
     }
 
-    /* Folder Sidebar */
+    /* Folder Sidebar - Enhanced Glassmorphism */
     .folder-sidebar {
         width: 250px;
-        background: var(--bg-card);
-        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
         padding: 1.5rem;
-        box-shadow: 0 2px 8px var(--shadow);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         overflow-y: auto;
     }
 
     .folder-sidebar h3 {
         font-size: 1.1rem;
         margin-bottom: 1rem;
-        color: var(--text-primary);
+        color: white;
         font-weight: 600;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
 
     .folder-list {
@@ -38,22 +42,26 @@
         align-items: center;
         gap: 0.75rem;
         padding: 0.75rem 1rem;
-        border-radius: 8px;
+        border-radius: 12px;
         cursor: pointer;
-        transition: all 0.2s;
+        transition: all 0.3s ease;
         margin-bottom: 0.5rem;
         text-decoration: none;
-        color: var(--text-primary);
+        color: white;
+        background: rgba(255, 255, 255, 0.05);
     }
 
     .folder-item:hover {
-        background: var(--bg-secondary);
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateX(5px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
 
     .folder-item.active {
-        background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         font-weight: 600;
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
     }
 
     .folder-icon {
@@ -76,27 +84,31 @@
         width: 100%;
         margin-top: 1rem;
         padding: 0.75rem;
-        background: var(--primary-gradient-start);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        border: none;
-        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
         cursor: pointer;
         font-weight: 600;
-        transition: all 0.3s;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
     }
 
     .new-folder-btn:hover {
-        background: var(--primary-gradient-end);
         transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
     }
 
-    /* Email List Area */
+    /* Email List Area - Enhanced Glassmorphism */
     .email-area {
         flex: 1;
-        background: var(--bg-card);
-        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
         padding: 1.5rem;
-        box-shadow: 0 2px 8px var(--shadow);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         overflow-y: auto;
     }
 
@@ -109,23 +121,26 @@
 
     .email-header h2 {
         font-size: 1.5rem;
-        color: var(--text-primary);
+        color: white;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
 
     .compose-btn {
         padding: 0.75rem 1.5rem;
-        background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        border: none;
-        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
         text-decoration: none;
         font-weight: 600;
-        transition: all 0.3s;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+        display: inline-block;
     }
 
     .compose-btn:hover {
         transform: translateY(-2px);
-        box-shadow: 0 5px 15px var(--shadow);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
     }
 
     .email-list {
@@ -136,19 +151,24 @@
 
     .email-item {
         padding: 1rem;
-        border-bottom: 1px solid var(--border-color);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         display: flex;
         justify-content: space-between;
         align-items: center;
-        transition: background 0.2s;
+        transition: all 0.3s ease;
+        border-radius: 12px;
+        margin-bottom: 0.5rem;
+        background: rgba(255, 255, 255, 0.05);
     }
 
     .email-item:hover {
-        background: var(--bg-secondary);
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateX(8px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
     }
 
     .email-item a {
-        color: inherit;
+        color: white;
         text-decoration: none;
         flex: 1;
     }
@@ -156,16 +176,16 @@
     .email-subject {
         font-weight: 600;
         margin-bottom: 0.25rem;
-        color: var(--text-primary);
+        color: white;
     }
 
     .email-from {
-        color: var(--text-secondary);
+        color: rgba(255, 255, 255, 0.8);
         font-size: 0.9rem;
     }
 
     .email-date {
-        color: var(--text-tertiary);
+        color: rgba(255, 255, 255, 0.7);
         font-size: 0.85rem;
         white-space: nowrap;
         margin-left: 1rem;
@@ -209,19 +229,21 @@
         height: 36px;
         border-radius: 50%;
         object-fit: cover;
-        border: 2px solid var(--border-color);
+        border: 2px solid rgba(255, 255, 255, 0.3);
         flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
 
     .sender-avatar-placeholder {
         width: 36px;
         height: 36px;
         border-radius: 50%;
-        background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         display: flex;
         align-items: center;
         justify-content: center;
         color: white;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         font-weight: 600;
         font-size: 0.9rem;
         flex-shrink: 0;
