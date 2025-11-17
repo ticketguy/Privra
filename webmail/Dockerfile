@@ -12,6 +12,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application
 COPY . .
 
+# Copy postfix services (for imports)
+COPY ../postfix/*.py .
+
 # Create necessary directories
 RUN mkdir -p /app/attachments /var/log/supervisor
 
