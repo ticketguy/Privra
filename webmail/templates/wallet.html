@@ -1,0 +1,574 @@
+{% extends "base.html" %}
+
+{% block title %}Multi-Chain Wallet - Privra{% endblock %}
+
+{% block content %}
+<style>
+    /* Wallet page with modern glassmorphism */
+    .wallet-container {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        animation: slideUp 0.5s ease-out;
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .glass-card {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        animation: fadeIn 0.6s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .glass-card h2 {
+        color: white;
+        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+    }
+
+    .chain-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
+
+    .chain-card {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        padding: 1.5rem;
+        transition: all 0.3s;
+    }
+
+    .chain-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.15);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    .chain-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .chain-name {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: white;
+        margin-bottom: 0.5rem;
+    }
+
+    .chain-network {
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.7);
+        margin-bottom: 1rem;
+    }
+
+    .wallet-address {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 0.75rem;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+        color: white;
+        word-break: break-all;
+        margin-bottom: 1rem;
+        position: relative;
+    }
+
+    .copy-btn {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        border-radius: 6px;
+        padding: 0.4rem 0.8rem;
+        color: white;
+        cursor: pointer;
+        font-size: 0.75rem;
+        transition: all 0.3s;
+    }
+
+    .copy-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-glass {
+        background: rgba(255, 255, 255, 0.25);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+
+    .btn-glass:hover {
+        background: rgba(255, 255, 255, 0.35);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-danger {
+        background: rgba(220, 53, 69, 0.3);
+        border-color: rgba(220, 53, 69, 0.5);
+    }
+
+    .btn-danger:hover {
+        background: rgba(220, 53, 69, 0.4);
+    }
+
+    /* Modal styles */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(5px);
+    }
+
+    .modal-content {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        margin: 10% auto;
+        padding: 2rem;
+        border-radius: 16px;
+        max-width: 500px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        animation: modalSlideIn 0.3s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .close {
+        color: white;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: color 0.3s;
+    }
+
+    .close:hover {
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .modal h3 {
+        color: white;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        color: white;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.9);
+        font-size: 1rem;
+    }
+
+    .private-key-display {
+        background: rgba(0, 0, 0, 0.5);
+        padding: 1rem;
+        border-radius: 8px;
+        color: #4ade80;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+        word-break: break-all;
+        margin-top: 1rem;
+        border: 1px solid rgba(255, 215, 0, 0.3);
+    }
+
+    .warning-box {
+        background: rgba(220, 53, 69, 0.2);
+        border: 2px solid rgba(220, 53, 69, 0.5);
+        border-radius: 8px;
+        padding: 1rem;
+        color: white;
+        margin-bottom: 1rem;
+    }
+
+    .warning-box strong {
+        color: #ff6b6b;
+    }
+
+    .explorer-link {
+        display: inline-block;
+        color: rgba(255, 255, 255, 0.9);
+        text-decoration: none;
+        font-size: 0.85rem;
+        padding: 0.4rem 0.8rem;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        transition: all 0.3s;
+        margin-top: 0.5rem;
+    }
+
+    .explorer-link:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateX(5px);
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+        .chain-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .modal-content {
+            margin: 20% 1rem;
+            width: auto;
+        }
+    }
+</style>
+
+<div class="wallet-container">
+    <div class="glass-card">
+        <h2>💰 Multi-Chain Wallet</h2>
+        <p style="color: rgba(255, 255, 255, 0.85);">
+            Your wallet works across multiple blockchains. One address per chain type (Solana, EVM).
+        </p>
+
+        <div class="chain-grid">
+            {% if wallets.solana %}
+            <div class="chain-card">
+                <div class="chain-icon">◎</div>
+                <div class="chain-name">Solana</div>
+                <div class="chain-network">{{ wallets.solana.network }}</div>
+                <div class="wallet-address">
+                    {{ wallets.solana.address }}
+                    <button class="copy-btn" onclick="copyAddress('{{ wallets.solana.address }}', this)">Copy</button>
+                </div>
+                <a href="{{ wallets.solana.explorer }}" target="_blank" class="explorer-link">
+                    🔍 View on Explorer →
+                </a>
+                <button class="btn-glass" onclick="showRevealModal('solana')">
+                    🔑 Reveal Private Key
+                </button>
+            </div>
+            {% endif %}
+
+            {% if wallets.ethereum %}
+            <div class="chain-card">
+                <div class="chain-icon">Ξ</div>
+                <div class="chain-name">Ethereum</div>
+                <div class="chain-network">{{ wallets.ethereum.network }}</div>
+                <div class="wallet-address">
+                    {{ wallets.ethereum.address }}
+                    <button class="copy-btn" onclick="copyAddress('{{ wallets.ethereum.address }}', this)">Copy</button>
+                </div>
+                <a href="{{ wallets.ethereum.explorer }}" target="_blank" class="explorer-link">
+                    🔍 View on Explorer →
+                </a>
+                <button class="btn-glass" onclick="showRevealModal('ethereum')">
+                    🔑 Reveal Private Key
+                </button>
+            </div>
+            {% endif %}
+
+            {% if wallets.base %}
+            <div class="chain-card">
+                <div class="chain-icon">🔵</div>
+                <div class="chain-name">Base</div>
+                <div class="chain-network">{{ wallets.base.network }}</div>
+                <div class="wallet-address">
+                    {{ wallets.base.address }}
+                    <button class="copy-btn" onclick="copyAddress('{{ wallets.base.address }}', this)">Copy</button>
+                </div>
+                <a href="{{ wallets.base.explorer }}" target="_blank" class="explorer-link">
+                    🔍 View on Explorer →
+                </a>
+                <button class="btn-glass" onclick="showRevealModal('base')">
+                    🔑 Reveal Private Key
+                </button>
+            </div>
+            {% endif %}
+
+            {% if wallets.polygon %}
+            <div class="chain-card">
+                <div class="chain-icon">🟣</div>
+                <div class="chain-name">Polygon</div>
+                <div class="chain-network">{{ wallets.polygon.network }}</div>
+                <div class="wallet-address">
+                    {{ wallets.polygon.address }}
+                    <button class="copy-btn" onclick="copyAddress('{{ wallets.polygon.address }}', this)">Copy</button>
+                </div>
+                <a href="{{ wallets.polygon.explorer }}" target="_blank" class="explorer-link">
+                    🔍 View on Explorer →
+                </a>
+                <button class="btn-glass" onclick="showRevealModal('polygon')">
+                    🔑 Reveal Private Key
+                </button>
+            </div>
+            {% endif %}
+
+            {% if wallets.arbitrum %}
+            <div class="chain-card">
+                <div class="chain-icon">🔷</div>
+                <div class="chain-name">Arbitrum</div>
+                <div class="chain-network">{{ wallets.arbitrum.network }}</div>
+                <div class="wallet-address">
+                    {{ wallets.arbitrum.address }}
+                    <button class="copy-btn" onclick="copyAddress('{{ wallets.arbitrum.address }}', this)">Copy</button>
+                </div>
+                <a href="{{ wallets.arbitrum.explorer }}" target="_blank" class="explorer-link">
+                    🔍 View on Explorer →
+                </a>
+                <button class="btn-glass" onclick="showRevealModal('arbitrum')">
+                    🔑 Reveal Private Key
+                </button>
+            </div>
+            {% endif %}
+
+            {% if wallets.optimism %}
+            <div class="chain-card">
+                <div class="chain-icon">🔴</div>
+                <div class="chain-name">Optimism</div>
+                <div class="chain-network">{{ wallets.optimism.network }}</div>
+                <div class="wallet-address">
+                    {{ wallets.optimism.address }}
+                    <button class="copy-btn" onclick="copyAddress('{{ wallets.optimism.address }}', this)">Copy</button>
+                </div>
+                <a href="{{ wallets.optimism.explorer }}" target="_blank" class="explorer-link">
+                    🔍 View on Explorer →
+                </a>
+                <button class="btn-glass" onclick="showRevealModal('optimism')">
+                    🔑 Reveal Private Key
+                </button>
+            </div>
+            {% endif %}
+        </div>
+
+        <button class="btn-glass btn-danger" onclick="showExportModal()" style="margin-top: 2rem;">
+            📥 Export Wallet (JSON)
+        </button>
+    </div>
+</div>
+
+<!-- Reveal Private Key Modal -->
+<div id="revealModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeRevealModal()">&times;</span>
+        <h3>🔑 Reveal Private Key</h3>
+
+        <div class="warning-box">
+            <strong>⚠️ WARNING:</strong> Never share your private key with anyone! Anyone with your private key can access and steal your funds.
+        </div>
+
+        <form id="revealForm" onsubmit="revealPrivateKey(event)">
+            <input type="hidden" id="reveal-chain" name="chain">
+
+            <div class="form-group">
+                <label for="reveal-password">Enter your password to reveal</label>
+                <input type="password" id="reveal-password" name="password" required placeholder="Your account password">
+            </div>
+
+            <div id="private-key-container" style="display: none;">
+                <div class="private-key-display" id="private-key-display"></div>
+                <button type="button" class="btn-glass" onclick="copyPrivateKey()" style="margin-top: 1rem;">
+                    📋 Copy Private Key
+                </button>
+            </div>
+
+            <button type="submit" class="btn-glass" id="reveal-btn">Reveal Private Key</button>
+        </form>
+    </div>
+</div>
+
+<!-- Export Wallet Modal -->
+<div id="exportModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeExportModal()">&times;</span>
+        <h3>📥 Export Wallet</h3>
+
+        <div class="warning-box">
+            <strong>⚠️ SECURITY WARNING:</strong> This will export all your private keys in JSON format. Keep this file extremely secure!
+        </div>
+
+        <form id="exportForm" onsubmit="exportWallet(event)">
+            <div class="form-group">
+                <label for="export-password">Enter your password to export</label>
+                <input type="password" id="export-password" name="password" required placeholder="Your account password">
+            </div>
+
+            <button type="submit" class="btn-glass">Download Wallet Export</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    let currentPrivateKey = '';
+
+    function copyAddress(address, btn) {
+        navigator.clipboard.writeText(address).then(() => {
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+        });
+    }
+
+    function showRevealModal(chain) {
+        document.getElementById('reveal-chain').value = chain;
+        document.getElementById('revealModal').style.display = 'block';
+        document.getElementById('private-key-container').style.display = 'none';
+        document.getElementById('reveal-password').value = '';
+    }
+
+    function closeRevealModal() {
+        document.getElementById('revealModal').style.display = 'none';
+        currentPrivateKey = '';
+    }
+
+    async function revealPrivateKey(event) {
+        event.preventDefault();
+
+        const formData = new FormData(event.target);
+        const btn = document.getElementById('reveal-btn');
+        btn.disabled = true;
+        btn.textContent = 'Revealing...';
+
+        try {
+            const response = await fetch('/wallet/reveal', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                currentPrivateKey = result.private_key;
+                document.getElementById('private-key-display').textContent = result.private_key;
+                document.getElementById('private-key-container').style.display = 'block';
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Reveal Private Key';
+        }
+    }
+
+    function copyPrivateKey() {
+        navigator.clipboard.writeText(currentPrivateKey).then(() => {
+            alert('Private key copied to clipboard!');
+        });
+    }
+
+    function showExportModal() {
+        document.getElementById('exportModal').style.display = 'block';
+        document.getElementById('export-password').value = '';
+    }
+
+    function closeExportModal() {
+        document.getElementById('exportModal').style.display = 'none';
+    }
+
+    async function exportWallet(event) {
+        event.preventDefault();
+
+        const formData = new FormData(event.target);
+
+        try {
+            const response = await fetch('/wallet/export', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Download as JSON file
+                const dataStr = JSON.stringify(result.data, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'privra-wallet-export-' + Date.now() + '.json';
+                link.click();
+                URL.revokeObjectURL(url);
+
+                closeExportModal();
+                alert('Wallet exported successfully! Keep this file secure.');
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const revealModal = document.getElementById('revealModal');
+        const exportModal = document.getElementById('exportModal');
+
+        if (event.target == revealModal) {
+            closeRevealModal();
+        }
+        if (event.target == exportModal) {
+            closeExportModal();
+        }
+    }
+</script>
+{% endblock %}

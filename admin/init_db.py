@@ -336,6 +336,92 @@ def init_database():
         )
     """)
 
+    # Create generated wallets table (multi-chain)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_wallets_generated (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) UNIQUE NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            solana_address VARCHAR(255) NOT NULL,
+            solana_private_key_encrypted TEXT NOT NULL,
+            solana_salt TEXT NOT NULL,
+            evm_address VARCHAR(255) NOT NULL,
+            evm_private_key_encrypted TEXT NOT NULL,
+            evm_salt TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create RPC configuration table (user-specific)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_rpc_config (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) UNIQUE NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            solana_rpc_url TEXT,
+            ethereum_rpc_url TEXT,
+            base_rpc_url TEXT,
+            polygon_rpc_url TEXT,
+            arbitrum_rpc_url TEXT,
+            optimism_rpc_url TEXT,
+            use_custom_rpc BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create global RPC configuration table (admin)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS global_rpc_config (
+            id SERIAL PRIMARY KEY,
+            config_name VARCHAR(50) UNIQUE NOT NULL,
+            solana_rpc_url TEXT DEFAULT 'https://mainnet.helius-rpc.com/?api-key=8675550c-52de-4fa5-8540-760140875275',
+            ethereum_rpc_url TEXT DEFAULT 'https://eth.llamarpc.com',
+            base_rpc_url TEXT DEFAULT 'https://mainnet.base.org',
+            polygon_rpc_url TEXT DEFAULT 'https://polygon-rpc.com',
+            arbitrum_rpc_url TEXT DEFAULT 'https://arb1.arbitrum.io/rpc',
+            optimism_rpc_url TEXT DEFAULT 'https://mainnet.optimism.io',
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Insert default RPC configuration
+    cur.execute("""
+        INSERT INTO global_rpc_config (config_name)
+        VALUES ('default')
+        ON CONFLICT (config_name) DO NOTHING
+    """)
+
+    # Create email folders/labels table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS email_folders (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            folder_name VARCHAR(100) NOT NULL,
+            folder_type VARCHAR(50) DEFAULT 'custom',
+            color VARCHAR(20),
+            icon VARCHAR(50),
+            is_system BOOLEAN DEFAULT FALSE,
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_email, folder_name)
+        )
+    """)
+
+    # Create email labels table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS email_labels (
+            id SERIAL PRIMARY KEY,
+            message_id VARCHAR(255) NOT NULL,
+            user_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            label_name VARCHAR(100) NOT NULL,
+            ai_generated BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(message_id, user_email, label_name)
+        )
+    """)
+
     # Create default admin user (admin/admin) - CHANGE THIS!
     import bcrypt
     default_password = bcrypt.hashpw(b'admin', bcrypt.gensalt()).decode('utf-8')

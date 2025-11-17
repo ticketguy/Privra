@@ -27,6 +27,7 @@ import sys
 sys.path.append('/app')
 from nft_verification_service import nft_service
 from reputation_service import reputation_service
+from wallet_service import wallet_service
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -351,11 +352,24 @@ def register():
             cur.close()
             conn.close()
 
+            # Generate multi-chain wallets for the user
+            try:
+                wallet_result = wallet_service.generate_wallets(email_addr, password)
+                if wallet_result['success']:
+                    print(f"✓ Wallets generated for {email_addr}")
+                    print(f"  Solana: {wallet_result['wallets']['solana']['address']}")
+                    print(f"  EVM: {wallet_result['wallets']['ethereum']['address']}")
+                else:
+                    print(f"⚠ Warning: Wallet generation failed for {email_addr}: {wallet_result.get('error')}")
+            except Exception as wallet_error:
+                print(f"⚠ Warning: Wallet generation error for {email_addr}: {wallet_error}")
+                # Don't fail registration if wallet generation fails
+
             # Store recovery key in session to show to user
             session['show_recovery_key'] = recovery_key
             session['recovery_email'] = email_addr
 
-            flash('Account created successfully!', 'success')
+            flash('Account created successfully! Multi-chain wallet generated.', 'success')
             return redirect(url_for('show_recovery_key'))
 
         except Exception as e:
@@ -1158,6 +1172,69 @@ def check_domain_verification():
         flash('Error verifying domain', 'error')
 
     return redirect(url_for('profile'))
+
+@app.route('/wallet')
+def wallet():
+    """Multi-chain wallet management"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        # Get user's wallets
+        wallet_result = wallet_service.get_wallets(session['email'])
+
+        if not wallet_result['success']:
+            flash('No wallets found. Please contact support.', 'error')
+            return redirect(url_for('profile'))
+
+        return render_template('wallet.html', wallets=wallet_result['wallets'])
+
+    except Exception as e:
+        print(f"Error loading wallet: {e}")
+        flash('Error loading wallet', 'error')
+        return redirect(url_for('profile'))
+
+@app.route('/wallet/reveal', methods=['POST'])
+def reveal_private_key_route():
+    """Reveal private key for a specific chain"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    chain = request.form.get('chain', '').lower()
+    password = request.form.get('password', '')
+
+    if not chain or not password:
+        return jsonify({'success': False, 'error': 'Chain and password required'}), 400
+
+    try:
+        result = wallet_service.reveal_private_key(session['email'], password, chain)
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error revealing private key: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/wallet/export', methods=['POST'])
+def export_wallet_route():
+    """Export wallet data (JSON format)"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    password = request.form.get('password', '')
+
+    if not password:
+        return jsonify({'success': False, 'error': 'Password required'}), 400
+
+    try:
+        result = wallet_service.export_wallet(session['email'], password, format='json')
+
+        if result['success']:
+            return jsonify(result)
+        else:
+            return jsonify(result), 400
+
+    except Exception as e:
+        print(f"Error exporting wallet: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
