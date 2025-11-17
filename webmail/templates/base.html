@@ -16,6 +16,9 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="/static/manifest.json">
 
+    <!-- Theme System -->
+    <link rel="stylesheet" href="/static/themes.css">
+
     <!-- Icons -->
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192x192.png">
     <link rel="apple-touch-icon" sizes="192x192" href="/static/icons/icon-192x192.png">
@@ -199,6 +202,10 @@
                 <a href="{{ url_for('wallet') }}">Wallet</a>
                 <a href="{{ url_for('consent_settings') }}">Privacy</a>
                 <a href="{{ url_for('account_settings') }}">Account</a>
+                <button class="theme-toggle" onclick="toggleTheme()" title="Change theme (click to cycle)">
+                    <span id="theme-toggle-btn">🌓</span>
+                    <span class="theme-indicator" id="theme-indicator">Auto</span>
+                </button>
                 <a href="{{ url_for('logout') }}">Logout</a>
             {% endif %}
         </nav>
@@ -217,6 +224,9 @@
 
         {% block content %}{% endblock %}
     </div>
+
+    <!-- Theme System -->
+    <script src="/static/theme-toggle.js"></script>
 
     <!-- Service Worker Registration -->
     <script>
