@@ -7,10 +7,13 @@ import email
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import decode_header
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_from_directory
 from datetime import datetime, timedelta
 import os
 import psycopg2
+from werkzeug.utils import secure_filename
+from PIL import Image
+import hashlib
 from portid_service import portid_service
 from crypto_utils import (
     decrypt_private_key_with_recovery_key,
@@ -33,6 +36,14 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 app.config['PREFERRED_URL_SCHEME'] = 'https'
+
+# File upload configuration
+app.config['UPLOAD_FOLDER'] = '/app/static/uploads/avatars'
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB max file size
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+# Ensure upload directory exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Handle reverse proxy headers
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
@@ -112,6 +123,38 @@ def get_email_body(msg):
         except:
             body = msg.get_payload()
     return body
+
+def allowed_file(filename):
+    """Check if file extension is allowed"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def process_avatar_image(image_file, user_email):
+    """Process and save avatar image"""
+    # Generate unique filename
+    file_hash = hashlib.md5(f"{user_email}{datetime.now().isoformat()}".encode()).hexdigest()[:12]
+    ext = image_file.filename.rsplit('.', 1)[1].lower()
+    filename = f"avatar_{file_hash}.{ext}"
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+    # Open and process image
+    img = Image.open(image_file)
+
+    # Convert RGBA to RGB if necessary
+    if img.mode in ('RGBA', 'LA', 'P'):
+        background = Image.new('RGB', img.size, (255, 255, 255))
+        if img.mode == 'P':
+            img = img.convert('RGBA')
+        background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+        img = background
+
+    # Resize to 400x400 (square avatar)
+    img = img.resize((400, 400), Image.Resampling.LANCZOS)
+
+    # Save optimized image
+    img.save(filepath, quality=85, optimize=True)
+
+    # Return relative URL path
+    return f'/static/uploads/avatars/{filename}'
 
 @app.route('/')
 def index():
@@ -1075,6 +1118,58 @@ def remove_wallet(wallet_id):
 
     return redirect(url_for('profile'))
 
+@app.route('/profile/upload-avatar', methods=['POST'])
+def upload_avatar():
+    """Upload and set profile avatar image"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    # Check if file was uploaded
+    if 'avatar' not in request.files:
+        flash('No file selected', 'error')
+        return redirect(url_for('profile'))
+
+    file = request.files['avatar']
+
+    # Check if filename is empty
+    if file.filename == '':
+        flash('No file selected', 'error')
+        return redirect(url_for('profile'))
+
+    # Validate file type
+    if not allowed_file(file.filename):
+        flash('Invalid file type. Allowed: PNG, JPG, JPEG, GIF, WEBP', 'error')
+        return redirect(url_for('profile'))
+
+    try:
+        # Process and save image
+        avatar_url = process_avatar_image(file, session['email'])
+
+        # Update database
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO user_profiles (user_email, avatar_url)
+            VALUES (%s, %s)
+            ON CONFLICT (user_email)
+            DO UPDATE SET
+                avatar_url = EXCLUDED.avatar_url,
+                updated_at = CURRENT_TIMESTAMP
+        """, (session['email'], avatar_url))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash('Profile picture updated successfully!', 'success')
+
+    except Exception as e:
+        print(f"Error uploading avatar: {e}")
+        flash('Error uploading image. Please try again.', 'error')
+
+    return redirect(url_for('profile'))
+
 @app.route('/profile/verify-nft', methods=['POST'])
 def verify_nft():
     """Set NFT as profile avatar"""
@@ -1172,6 +1267,11 @@ def check_domain_verification():
         flash('Error verifying domain', 'error')
 
     return redirect(url_for('profile'))
+
+@app.route('/static/uploads/<path:filename>')
+def uploaded_file(filename):
+    """Serve uploaded files"""
+    return send_from_directory('/app/static/uploads', filename)
 
 @app.route('/wallet')
 def wallet():

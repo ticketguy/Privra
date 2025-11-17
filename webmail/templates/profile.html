@@ -452,6 +452,26 @@
         </form>
     </div>
 
+    <!-- Upload Avatar -->
+    <div class="glass-card">
+        <h2>📸 Profile Picture</h2>
+        <p style="color: rgba(255, 255, 255, 0.85); margin-bottom: 1rem;">
+            Upload a custom profile picture or use an NFT (below)
+        </p>
+
+        <form method="POST" action="{{ url_for('upload_avatar') }}" enctype="multipart/form-data">
+            <div class="form-group-white">
+                <label for="avatar">Choose Image</label>
+                <input type="file" id="avatar" name="avatar" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" required
+                       style="padding: 0.5rem; background: rgba(255, 255, 255, 0.95);">
+                <small style="display: block; color: rgba(255, 255, 255, 0.7); margin-top: 0.5rem;">
+                    Supported formats: PNG, JPG, JPEG, GIF, WEBP (Max 5MB)
+                </small>
+            </div>
+            <button type="submit" class="btn-glass">Upload Picture</button>
+        </form>
+    </div>
+
     <!-- Wallet Management -->
     <div class="glass-card">
         <h2>💰 Wallets</h2>
