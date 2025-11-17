@@ -7,10 +7,13 @@ import email
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import decode_header
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_from_directory
 from datetime import datetime, timedelta
 import os
 import psycopg2
+from werkzeug.utils import secure_filename
+from PIL import Image
+import hashlib
 from portid_service import portid_service
 from crypto_utils import (
     decrypt_private_key_with_recovery_key,
@@ -23,11 +26,26 @@ from Crypto.Random import get_random_bytes
 import bcrypt
 from email_categorizer import EmailCategorizer
 from werkzeug.middleware.proxy_fix import ProxyFix
+import sys
+sys.path.append('/app')
+from nft_verification_service import nft_service
+from reputation_service import reputation_service
+from wallet_service import wallet_service
+from folder_service import folder_service
+from ai_labeling import ai_labeling_service
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 app.config['PREFERRED_URL_SCHEME'] = 'https'
+
+# File upload configuration
+app.config['UPLOAD_FOLDER'] = '/app/static/uploads/avatars'
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB max file size
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+# Ensure upload directory exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Handle reverse proxy headers
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
@@ -84,6 +102,104 @@ def decode_mime_words(s):
             fragments.append(fragment)
     return ''.join(fragments)
 
+def get_sender_verification(email_addr):
+    """Get verification status for a sender"""
+    try:
+        # Extract just email if it has name (e.g., "Name <email@domain.com>")
+        if '<' in email_addr and '>' in email_addr:
+            email_addr = email_addr.split('<')[1].split('>')[0].strip()
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Check user profile for verification
+        cur.execute("""
+            SELECT
+                up.is_verified,
+                up.verification_method,
+                up.nft_badge_mint,
+                up.display_name,
+                up.avatar_url,
+                rs.reputation_level,
+                rs.total_score
+            FROM user_profiles up
+            LEFT JOIN reputation_scores rs ON up.user_email = rs.user_email
+            WHERE up.user_email = %s
+        """, (email_addr,))
+
+        result = cur.fetchone()
+
+        # Check domain verification
+        cur.execute("""
+            SELECT domain, verified
+            FROM domain_verifications
+            WHERE user_email = %s AND verified = TRUE
+            LIMIT 1
+        """, (email_addr,))
+
+        domain_verified = cur.fetchone()
+
+        cur.close()
+        conn.close()
+
+        if not result:
+            return {
+                'verified': False,
+                'method': None,
+                'reputation_level': 'new',
+                'score': 0,
+                'display_name': None,
+                'avatar_url': None,
+                'badges': []
+            }
+
+        is_verified, method, nft_mint, display_name, avatar_url, rep_level, score = result
+
+        # Determine badges
+        badges = []
+        if is_verified:
+            if method == 'nft' and nft_mint:
+                badges.append({'type': 'nft', 'text': 'NFT Verified', 'icon': '🖼️', 'color': '#8b5cf6'})
+            if domain_verified:
+                badges.append({'type': 'domain', 'text': f'Domain: {domain_verified[0]}', 'icon': '✅', 'color': '#10b981'})
+
+        # Reputation badge
+        if rep_level and rep_level != 'new':
+            rep_colors = {
+                'trusted': '#3b82f6',
+                'verified': '#10b981',
+                'elite': '#f59e0b',
+                'legendary': '#dc2626'
+            }
+            badges.append({
+                'type': 'reputation',
+                'text': rep_level.capitalize(),
+                'icon': '⭐',
+                'color': rep_colors.get(rep_level, '#6b7280')
+            })
+
+        return {
+            'verified': is_verified or bool(domain_verified),
+            'method': method,
+            'reputation_level': rep_level or 'new',
+            'score': score or 0,
+            'display_name': display_name,
+            'avatar_url': avatar_url,
+            'badges': badges
+        }
+
+    except Exception as e:
+        print(f"Error checking verification: {e}")
+        return {
+            'verified': False,
+            'method': None,
+            'reputation_level': 'new',
+            'score': 0,
+            'display_name': None,
+            'avatar_url': None,
+            'badges': []
+        }
+
 def get_email_body(msg):
     """Extract email body from message"""
     body = ""
@@ -107,6 +223,38 @@ def get_email_body(msg):
         except:
             body = msg.get_payload()
     return body
+
+def allowed_file(filename):
+    """Check if file extension is allowed"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def process_avatar_image(image_file, user_email):
+    """Process and save avatar image"""
+    # Generate unique filename
+    file_hash = hashlib.md5(f"{user_email}{datetime.now().isoformat()}".encode()).hexdigest()[:12]
+    ext = image_file.filename.rsplit('.', 1)[1].lower()
+    filename = f"avatar_{file_hash}.{ext}"
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+    # Open and process image
+    img = Image.open(image_file)
+
+    # Convert RGBA to RGB if necessary
+    if img.mode in ('RGBA', 'LA', 'P'):
+        background = Image.new('RGB', img.size, (255, 255, 255))
+        if img.mode == 'P':
+            img = img.convert('RGBA')
+        background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+        img = background
+
+    # Resize to 400x400 (square avatar)
+    img = img.resize((400, 400), Image.Resampling.LANCZOS)
+
+    # Save optimized image
+    img.save(filepath, quality=85, optimize=True)
+
+    # Return relative URL path
+    return f'/static/uploads/avatars/{filename}'
 
 @app.route('/')
 def index():
@@ -347,11 +495,34 @@ def register():
             cur.close()
             conn.close()
 
+            # Generate multi-chain wallets for the user
+            try:
+                wallet_result = wallet_service.generate_wallets(email_addr, password)
+                if wallet_result['success']:
+                    print(f"✓ Wallets generated for {email_addr}")
+                    print(f"  Solana: {wallet_result['wallets']['solana']['address']}")
+                    print(f"  EVM: {wallet_result['wallets']['ethereum']['address']}")
+                else:
+                    print(f"⚠ Warning: Wallet generation failed for {email_addr}: {wallet_result.get('error')}")
+            except Exception as wallet_error:
+                print(f"⚠ Warning: Wallet generation error for {email_addr}: {wallet_error}")
+                # Don't fail registration if wallet generation fails
+
+            # Create default email folders/categories
+            try:
+                if folder_service.create_default_folders(email_addr):
+                    print(f"✓ Default folders created for {email_addr}")
+                else:
+                    print(f"⚠ Warning: Folder creation failed for {email_addr}")
+            except Exception as folder_error:
+                print(f"⚠ Warning: Folder creation error for {email_addr}: {folder_error}")
+                # Don't fail registration if folder creation fails
+
             # Store recovery key in session to show to user
             session['show_recovery_key'] = recovery_key
             session['recovery_email'] = email_addr
 
-            flash('Account created successfully!', 'success')
+            flash('Account created successfully! Multi-chain wallet & folders ready.', 'success')
             return redirect(url_for('show_recovery_key'))
 
         except Exception as e:
@@ -489,13 +660,17 @@ def inbox():
                 except:
                     date = datetime.now()
 
+                # Get sender verification info
+                verification = get_sender_verification(from_addr)
+
                 emails.append({
                     'id': email_id.decode(),
                     'subject': subject,
                     'from': from_addr,
                     'date': date.strftime('%Y-%m-%d %H:%M'),
                     'category': category,
-                    'category_name': category_name
+                    'category_name': category_name,
+                    'verification': verification
                 })
             except Exception as e:
                 print(f"Error parsing email {email_id}: {e}")
@@ -548,6 +723,9 @@ def view_email(email_id):
         except:
             date_formatted = date_str
 
+        # Get sender verification info
+        verification = get_sender_verification(from_addr)
+
         mail.logout()
 
         return render_template('view_email.html',
@@ -556,7 +734,8 @@ def view_email(email_id):
                              to_addr=to_addr,
                              date=date_formatted,
                              body=body,
-                             is_encrypted=is_encrypted)
+                             is_encrypted=is_encrypted,
+                             verification=verification)
 
     except Exception as e:
         print(f"View email error: {e}")
@@ -877,6 +1056,884 @@ def account_settings():
         print(f"Error loading account settings: {e}")
         flash('Error loading account settings', 'error')
         return redirect(url_for('dashboard'))
+
+@app.route('/profile', methods=['GET', 'POST'])
+def profile():
+    """User profile management"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    user_email = session['email']
+
+    if request.method == 'POST':
+        # Update profile
+        display_name = request.form.get('display_name', '').strip()
+        bio = request.form.get('bio', '').strip()
+        profile_type = request.form.get('profile_type', 'individual')
+        org_name = request.form.get('org_name', '').strip() if profile_type == 'organization' else None
+        org_domain = request.form.get('org_domain', '').strip() if profile_type == 'organization' else None
+
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+
+            # Upsert user profile
+            cur.execute("""
+                INSERT INTO user_profiles
+                (user_email, display_name, bio, profile_type, organization_name, organization_domain)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (user_email)
+                DO UPDATE SET
+                    display_name = EXCLUDED.display_name,
+                    bio = EXCLUDED.bio,
+                    profile_type = EXCLUDED.profile_type,
+                    organization_name = EXCLUDED.organization_name,
+                    organization_domain = EXCLUDED.organization_domain,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (user_email, display_name, bio, profile_type, org_name, org_domain))
+
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            flash('Profile updated successfully!', 'success')
+        except Exception as e:
+            print(f"Error updating profile: {e}")
+            flash('Error updating profile', 'error')
+
+        return redirect(url_for('profile'))
+
+    # Get profile data
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Get user profile
+        cur.execute("""
+            SELECT display_name, bio, avatar_url, profile_type, organization_name,
+                   organization_domain, is_verified, verification_method, nft_badge_mint
+            FROM user_profiles
+            WHERE user_email = %s
+        """, (user_email,))
+        profile = cur.fetchone()
+
+        # Get wallets
+        cur.execute("""
+            SELECT id, wallet_address, wallet_type, is_primary, is_verified, created_at
+            FROM user_wallets
+            WHERE user_email = %s
+            ORDER BY is_primary DESC, created_at DESC
+        """, (user_email,))
+        wallets = cur.fetchall()
+
+        # Get reputation
+        reputation = reputation_service.get_reputation(user_email)
+        trust_percentage = reputation_service.calculate_trust_percentage(user_email)
+
+        # Get domain verifications
+        cur.execute("""
+            SELECT domain, verification_token, verified, verified_at
+            FROM domain_verifications
+            WHERE user_email = %s
+            ORDER BY created_at DESC
+        """, (user_email,))
+        domains = cur.fetchall()
+
+        cur.close()
+        conn.close()
+
+        profile_data = None
+        if profile:
+            profile_data = {
+                'display_name': profile[0],
+                'bio': profile[1],
+                'avatar_url': profile[2],
+                'profile_type': profile[3] or 'individual',
+                'organization_name': profile[4],
+                'organization_domain': profile[5],
+                'is_verified': profile[6],
+                'verification_method': profile[7],
+                'nft_badge_mint': profile[8]
+            }
+
+        return render_template('profile.html',
+                             profile=profile_data,
+                             wallets=wallets,
+                             reputation=reputation,
+                             trust_percentage=trust_percentage,
+                             domains=domains)
+
+    except Exception as e:
+        print(f"Error loading profile: {e}")
+        flash('Error loading profile', 'error')
+        return redirect(url_for('dashboard'))
+
+@app.route('/profile/wallet/add', methods=['POST'])
+def add_wallet():
+    """Add wallet to user profile"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    wallet_address = request.form.get('wallet_address', '').strip()
+    wallet_type = request.form.get('wallet_type', 'solana')
+
+    if not wallet_address:
+        flash('Wallet address is required', 'error')
+        return redirect(url_for('profile'))
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Check if this is the first wallet (make it primary)
+        cur.execute("""
+            SELECT COUNT(*) FROM user_wallets WHERE user_email = %s
+        """, (session['email'],))
+        wallet_count = cur.fetchone()[0]
+        is_primary = (wallet_count == 0)
+
+        # Insert wallet
+        cur.execute("""
+            INSERT INTO user_wallets (user_email, wallet_address, wallet_type, is_primary)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (user_email, wallet_address) DO NOTHING
+        """, (session['email'], wallet_address, wallet_type, is_primary))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash(f'Wallet {wallet_address[:8]}... added successfully!', 'success')
+    except Exception as e:
+        print(f"Error adding wallet: {e}")
+        flash('Error adding wallet', 'error')
+
+    return redirect(url_for('profile'))
+
+@app.route('/profile/wallet/remove/<int:wallet_id>', methods=['POST'])
+def remove_wallet(wallet_id):
+    """Remove wallet from user profile"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("""
+            DELETE FROM user_wallets
+            WHERE id = %s AND user_email = %s
+        """, (wallet_id, session['email']))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash('Wallet removed successfully!', 'success')
+    except Exception as e:
+        print(f"Error removing wallet: {e}")
+        flash('Error removing wallet', 'error')
+
+    return redirect(url_for('profile'))
+
+@app.route('/profile/upload-avatar', methods=['POST'])
+def upload_avatar():
+    """Upload and set profile avatar image"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    # Check if file was uploaded
+    if 'avatar' not in request.files:
+        flash('No file selected', 'error')
+        return redirect(url_for('profile'))
+
+    file = request.files['avatar']
+
+    # Check if filename is empty
+    if file.filename == '':
+        flash('No file selected', 'error')
+        return redirect(url_for('profile'))
+
+    # Validate file type
+    if not allowed_file(file.filename):
+        flash('Invalid file type. Allowed: PNG, JPG, JPEG, GIF, WEBP', 'error')
+        return redirect(url_for('profile'))
+
+    try:
+        # Process and save image
+        avatar_url = process_avatar_image(file, session['email'])
+
+        # Update database
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO user_profiles (user_email, avatar_url)
+            VALUES (%s, %s)
+            ON CONFLICT (user_email)
+            DO UPDATE SET
+                avatar_url = EXCLUDED.avatar_url,
+                updated_at = CURRENT_TIMESTAMP
+        """, (session['email'], avatar_url))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash('Profile picture updated successfully!', 'success')
+
+    except Exception as e:
+        print(f"Error uploading avatar: {e}")
+        flash('Error uploading image. Please try again.', 'error')
+
+    return redirect(url_for('profile'))
+
+@app.route('/profile/verify-nft', methods=['POST'])
+def verify_nft():
+    """Set NFT as profile avatar"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    nft_mint = request.form.get('nft_mint', '').strip()
+    wallet_address = request.form.get('wallet_address', '').strip()
+
+    if not nft_mint or not wallet_address:
+        flash('NFT mint address and wallet address are required', 'error')
+        return redirect(url_for('profile'))
+
+    try:
+        # Set NFT as avatar
+        success, message = nft_service.set_nft_as_avatar(
+            session['email'],
+            nft_mint,
+            wallet_address
+        )
+
+        if success:
+            # Record reputation event
+            reputation_service.record_event(
+                session['email'],
+                'nft_verified',
+                'verification',
+                'NFT set as profile avatar',
+                {'nft_mint': nft_mint, 'wallet': wallet_address}
+            )
+            flash(message, 'success')
+        else:
+            flash(message, 'error')
+
+    except Exception as e:
+        print(f"Error verifying NFT: {e}")
+        flash('Error verifying NFT', 'error')
+
+    return redirect(url_for('profile'))
+
+@app.route('/profile/verify-domain/start', methods=['POST'])
+def start_domain_verification():
+    """Generate domain verification token"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    domain = request.form.get('domain', '').strip()
+
+    if not domain:
+        flash('Domain is required', 'error')
+        return redirect(url_for('profile'))
+
+    try:
+        # Generate verification token
+        token = nft_service.generate_domain_verification_token(session['email'], domain)
+
+        flash(f'Add this TXT record to {domain}: privra-verify={token}', 'success')
+    except Exception as e:
+        print(f"Error generating domain token: {e}")
+        flash('Error generating verification token', 'error')
+
+    return redirect(url_for('profile'))
+
+@app.route('/profile/verify-domain/check', methods=['POST'])
+def check_domain_verification():
+    """Verify domain ownership via DNS"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    domain = request.form.get('domain', '').strip()
+
+    if not domain:
+        flash('Domain is required', 'error')
+        return redirect(url_for('profile'))
+
+    try:
+        # Verify domain
+        success, message = nft_service.verify_domain_ownership(session['email'], domain)
+
+        if success:
+            # Record reputation event
+            reputation_service.record_event(
+                session['email'],
+                'domain_verified',
+                'verification',
+                f'Domain {domain} verified',
+                {'domain': domain}
+            )
+            flash(message, 'success')
+        else:
+            flash(message, 'error')
+
+    except Exception as e:
+        print(f"Error verifying domain: {e}")
+        flash('Error verifying domain', 'error')
+
+    return redirect(url_for('profile'))
+
+@app.route('/static/uploads/<path:filename>')
+def uploaded_file(filename):
+    """Serve uploaded files"""
+    return send_from_directory('/app/static/uploads', filename)
+
+@app.route('/wallet')
+def wallet():
+    """Multi-chain wallet management"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        # Get user's wallets
+        wallet_result = wallet_service.get_wallets(session['email'])
+
+        if not wallet_result['success']:
+            flash('No wallets found. Please contact support.', 'error')
+            return redirect(url_for('profile'))
+
+        return render_template('wallet.html', wallets=wallet_result['wallets'])
+
+    except Exception as e:
+        print(f"Error loading wallet: {e}")
+        flash('Error loading wallet', 'error')
+        return redirect(url_for('profile'))
+
+@app.route('/wallet/reveal', methods=['POST'])
+def reveal_private_key_route():
+    """Reveal private key for a specific chain"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    chain = request.form.get('chain', '').lower()
+    password = request.form.get('password', '')
+
+    if not chain or not password:
+        return jsonify({'success': False, 'error': 'Chain and password required'}), 400
+
+    try:
+        result = wallet_service.reveal_private_key(session['email'], password, chain)
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error revealing private key: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/wallet/export', methods=['POST'])
+def export_wallet_route():
+    """Export wallet data (JSON format)"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    password = request.form.get('password', '')
+
+    if not password:
+        return jsonify({'success': False, 'error': 'Password required'}), 400
+
+    try:
+        result = wallet_service.export_wallet(session['email'], password, format='json')
+
+        if result['success']:
+            return jsonify(result)
+        else:
+            return jsonify(result), 400
+
+    except Exception as e:
+        print(f"Error exporting wallet: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/folders')
+def folders():
+    """Get user's folders (for inbox sidebar)"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        folders_list = folder_service.get_folders(session['email'])
+        return jsonify({'success': True, 'folders': folders_list})
+    except Exception as e:
+        print(f"Error getting folders: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/folders/create', methods=['POST'])
+def create_folder():
+    """Create a custom folder/label"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    folder_name = request.form.get('folder_name', '').strip()
+    color = request.form.get('color', '#667eea')
+    icon = request.form.get('icon', '📁')
+
+    if not folder_name:
+        return jsonify({'success': False, 'error': 'Folder name required'}), 400
+
+    try:
+        success, message = folder_service.create_custom_folder(
+            session['email'],
+            folder_name,
+            color,
+            icon
+        )
+
+        if success:
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'success': False, 'error': message}), 400
+
+    except Exception as e:
+        print(f"Error creating folder: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/folders/delete/<int:folder_id>', methods=['POST'])
+def delete_folder(folder_id):
+    """Delete a custom folder"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    try:
+        success, message = folder_service.delete_custom_folder(session['email'], folder_id)
+
+        if success:
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'success': False, 'error': message}), 400
+
+    except Exception as e:
+        print(f"Error deleting folder: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/email/<message_id>/label', methods=['POST'])
+def label_email(message_id):
+    """Add a label to an email"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    label_name = request.form.get('label_name', '').strip()
+
+    if not label_name:
+        return jsonify({'success': False, 'error': 'Label name required'}), 400
+
+    try:
+        success = folder_service.add_label_to_email(
+            session['email'],
+            message_id,
+            label_name,
+            ai_generated=False
+        )
+
+        if success:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to add label'}), 500
+
+    except Exception as e:
+        print(f"Error labeling email: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/email/<message_id>/unlabel', methods=['POST'])
+def unlabel_email(message_id):
+    """Remove a label from an email"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    label_name = request.form.get('label_name', '').strip()
+
+    if not label_name:
+        return jsonify({'success': False, 'error': 'Label name required'}), 400
+
+    try:
+        success = folder_service.remove_label_from_email(
+            session['email'],
+            message_id,
+            label_name
+        )
+
+        if success:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to remove label'}), 500
+
+    except Exception as e:
+        print(f"Error unlabeling email: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============================================
+# AI Email Labeling Routes
+# ============================================
+
+@app.route('/email/auto-label', methods=['POST'])
+def auto_label_emails():
+    """Automatically label emails in inbox using AI"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    try:
+        # Connect to IMAP
+        mail = connect_imap(session['email'], session['password'])
+        if not mail:
+            return jsonify({'success': False, 'error': 'Failed to connect to mail server'}), 500
+
+        mail.select('INBOX')
+        status, messages = mail.search(None, 'ALL')
+        email_ids = messages[0].split()
+
+        labeled_count = 0
+        spam_count = 0
+        important_count = 0
+
+        for email_id in email_ids:
+            try:
+                # Fetch email
+                status, msg_data = mail.fetch(email_id, '(RFC822)')
+                email_body = msg_data[0][1]
+                email_message = email.message_from_bytes(email_body)
+
+                # Get subject and sender
+                subject = email_message.get('Subject', '')
+                if subject:
+                    subject, encoding = decode_header(subject)[0]
+                    if isinstance(subject, bytes):
+                        subject = subject.decode(encoding or 'utf-8', errors='ignore')
+
+                from_addr = email_message.get('From', '')
+                if from_addr:
+                    from_header = decode_header(from_addr)[0]
+                    if isinstance(from_header[0], bytes):
+                        from_addr = from_header[0].decode(from_header[1] or 'utf-8', errors='ignore')
+
+                # Get email body for better analysis
+                body = ''
+                if email_message.is_multipart():
+                    for part in email_message.walk():
+                        if part.get_content_type() == 'text/plain':
+                            try:
+                                payload = part.get_payload(decode=True)
+                                if payload:
+                                    body = payload.decode('utf-8', errors='ignore')
+                                    break
+                            except:
+                                pass
+                else:
+                    try:
+                        payload = email_message.get_payload(decode=True)
+                        if payload:
+                            body = payload.decode('utf-8', errors='ignore')
+                    except:
+                        pass
+
+                # Limit body length for analysis
+                body = body[:1000] if body else ''
+
+                # Analyze with AI
+                category = ai_labeling_service.categorize_email(from_addr, subject, body)
+
+                # Add label if not inbox
+                if category != 'inbox':
+                    message_id = email_id.decode()
+                    folder_service.add_label_to_email(
+                        session['email'],
+                        message_id,
+                        category,
+                        ai_generated=True
+                    )
+                    labeled_count += 1
+
+                    if category == 'spam':
+                        spam_count += 1
+                    elif category == 'important':
+                        important_count += 1
+
+            except Exception as e:
+                print(f"Error analyzing email {email_id}: {e}")
+                continue
+
+        mail.logout()
+
+        return jsonify({
+            'success': True,
+            'message': f'Labeled {labeled_count} emails ({spam_count} spam, {important_count} important)',
+            'labeled': labeled_count,
+            'spam': spam_count,
+            'important': important_count
+        })
+
+    except Exception as e:
+        print(f"Error in auto-labeling: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/email/<message_id>/suggest-labels', methods=['GET'])
+def suggest_labels(message_id):
+    """Get AI suggested labels for a specific email"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    try:
+        # Connect to IMAP
+        mail = connect_imap(session['email'], session['password'])
+        if not mail:
+            return jsonify({'success': False, 'error': 'Failed to connect to mail server'}), 500
+
+        mail.select('INBOX')
+
+        # Fetch the specific email
+        status, msg_data = mail.fetch(message_id.encode(), '(RFC822)')
+        email_body = msg_data[0][1]
+        email_message = email.message_from_bytes(email_body)
+
+        # Get subject and sender
+        subject = email_message.get('Subject', '')
+        if subject:
+            subject, encoding = decode_header(subject)[0]
+            if isinstance(subject, bytes):
+                subject = subject.decode(encoding or 'utf-8', errors='ignore')
+
+        from_addr = email_message.get('From', '')
+        if from_addr:
+            from_header = decode_header(from_addr)[0]
+            if isinstance(from_header[0], bytes):
+                from_addr = from_header[0].decode(from_header[1] or 'utf-8', errors='ignore')
+
+        # Get email body
+        body = ''
+        if email_message.is_multipart():
+            for part in email_message.walk():
+                if part.get_content_type() == 'text/plain':
+                    try:
+                        payload = part.get_payload(decode=True)
+                        if payload:
+                            body = payload.decode('utf-8', errors='ignore')
+                            break
+                    except:
+                        pass
+        else:
+            try:
+                payload = email_message.get_payload(decode=True)
+                if payload:
+                    body = payload.decode('utf-8', errors='ignore')
+            except:
+                pass
+
+        body = body[:1000] if body else ''
+
+        # Analyze with AI
+        labels = ai_labeling_service.analyze_email(from_addr, subject, body)
+        category = ai_labeling_service.categorize_email(from_addr, subject, body)
+
+        mail.logout()
+
+        return jsonify({
+            'success': True,
+            'labels': labels,
+            'category': category,
+            'from': from_addr,
+            'subject': subject
+        })
+
+    except Exception as e:
+        print(f"Error suggesting labels: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============================================
+# RPC Configuration Routes
+# ============================================
+
+@app.route('/settings/rpc')
+def rpc_settings():
+    """User RPC configuration page"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Check if user is admin
+    cur.execute("SELECT is_admin FROM users WHERE email = %s", (session['email'],))
+    is_admin = cur.fetchone()
+    is_admin = is_admin[0] if is_admin else False
+
+    # Get user's RPC config or create default
+    cur.execute("""
+        SELECT use_custom_rpc, solana_rpc_url, ethereum_rpc_url,
+               base_rpc_url, polygon_rpc_url, arbitrum_rpc_url, optimism_rpc_url
+        FROM user_rpc_config
+        WHERE user_email = %s
+    """, (session['email'],))
+
+    user_config = cur.fetchone()
+
+    if not user_config:
+        # Create default config
+        cur.execute("""
+            INSERT INTO user_rpc_config (user_email, use_custom_rpc)
+            VALUES (%s, FALSE)
+            RETURNING use_custom_rpc, solana_rpc_url, ethereum_rpc_url,
+                      base_rpc_url, polygon_rpc_url, arbitrum_rpc_url, optimism_rpc_url
+        """, (session['email'],))
+        user_config = cur.fetchone()
+        conn.commit()
+
+    # Get global defaults for reference
+    cur.execute("""
+        SELECT solana_rpc_url, ethereum_rpc_url, base_rpc_url,
+               polygon_rpc_url, arbitrum_rpc_url, optimism_rpc_url
+        FROM global_rpc_config
+        WHERE is_active = TRUE
+        LIMIT 1
+    """)
+
+    global_config = cur.fetchone()
+
+    return render_template('rpc_settings.html',
+                         is_admin=is_admin,
+                         use_custom=user_config[0] if user_config else False,
+                         user_config={
+                             'solana': user_config[1] if user_config else '',
+                             'ethereum': user_config[2] if user_config else '',
+                             'base': user_config[3] if user_config else '',
+                             'polygon': user_config[4] if user_config else '',
+                             'arbitrum': user_config[5] if user_config else '',
+                             'optimism': user_config[6] if user_config else ''
+                         },
+                         global_config={
+                             'solana': global_config[0] if global_config else '',
+                             'ethereum': global_config[1] if global_config else '',
+                             'base': global_config[2] if global_config else '',
+                             'polygon': global_config[3] if global_config else '',
+                             'arbitrum': global_config[4] if global_config else '',
+                             'optimism': global_config[5] if global_config else ''
+                         })
+
+@app.route('/settings/rpc/save', methods=['POST'])
+def save_rpc_settings():
+    """Save user RPC configuration"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    use_custom = request.form.get('use_custom_rpc') == 'true'
+    solana_rpc = request.form.get('solana_rpc', '').strip()
+    ethereum_rpc = request.form.get('ethereum_rpc', '').strip()
+    base_rpc = request.form.get('base_rpc', '').strip()
+    polygon_rpc = request.form.get('polygon_rpc', '').strip()
+    arbitrum_rpc = request.form.get('arbitrum_rpc', '').strip()
+    optimism_rpc = request.form.get('optimism_rpc', '').strip()
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Update or insert user config
+        cur.execute("""
+            INSERT INTO user_rpc_config (
+                user_email, use_custom_rpc, solana_rpc_url, ethereum_rpc_url,
+                base_rpc_url, polygon_rpc_url, arbitrum_rpc_url, optimism_rpc_url,
+                updated_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (user_email) DO UPDATE SET
+                use_custom_rpc = EXCLUDED.use_custom_rpc,
+                solana_rpc_url = EXCLUDED.solana_rpc_url,
+                ethereum_rpc_url = EXCLUDED.ethereum_rpc_url,
+                base_rpc_url = EXCLUDED.base_rpc_url,
+                polygon_rpc_url = EXCLUDED.polygon_rpc_url,
+                arbitrum_rpc_url = EXCLUDED.arbitrum_rpc_url,
+                optimism_rpc_url = EXCLUDED.optimism_rpc_url,
+                updated_at = NOW()
+        """, (session['email'], use_custom, solana_rpc or None, ethereum_rpc or None,
+              base_rpc or None, polygon_rpc or None, arbitrum_rpc or None, optimism_rpc or None))
+
+        conn.commit()
+        return jsonify({'success': True, 'message': 'RPC settings saved successfully'})
+
+    except Exception as e:
+        print(f"Error saving RPC settings: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/rpc')
+def admin_rpc_settings():
+    """Admin RPC configuration page"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    # Check if user is admin
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT is_admin FROM users WHERE email = %s", (session['email'],))
+    result = cur.fetchone()
+
+    if not result or not result[0]:
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('inbox'))
+
+    # Get current global RPC config
+    cur.execute("""
+        SELECT id, config_name, solana_rpc_url, ethereum_rpc_url,
+               base_rpc_url, polygon_rpc_url, arbitrum_rpc_url, optimism_rpc_url,
+               is_active
+        FROM global_rpc_config
+        ORDER BY is_active DESC, config_name
+    """)
+
+    configs = cur.fetchall()
+
+    return render_template('admin_rpc.html', configs=configs)
+
+@app.route('/admin/rpc/save', methods=['POST'])
+def save_admin_rpc_settings():
+    """Save global RPC configuration (admin only)"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    # Check if user is admin
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT is_admin FROM users WHERE email = %s", (session['email'],))
+    result = cur.fetchone()
+
+    if not result or not result[0]:
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+
+    config_id = request.form.get('config_id')
+    solana_rpc = request.form.get('solana_rpc', '').strip()
+    ethereum_rpc = request.form.get('ethereum_rpc', '').strip()
+    base_rpc = request.form.get('base_rpc', '').strip()
+    polygon_rpc = request.form.get('polygon_rpc', '').strip()
+    arbitrum_rpc = request.form.get('arbitrum_rpc', '').strip()
+    optimism_rpc = request.form.get('optimism_rpc', '').strip()
+
+    try:
+        if config_id:
+            # Update existing config
+            cur.execute("""
+                UPDATE global_rpc_config SET
+                    solana_rpc_url = %s,
+                    ethereum_rpc_url = %s,
+                    base_rpc_url = %s,
+                    polygon_rpc_url = %s,
+                    arbitrum_rpc_url = %s,
+                    optimism_rpc_url = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+            """, (solana_rpc, ethereum_rpc, base_rpc, polygon_rpc,
+                  arbitrum_rpc, optimism_rpc, config_id))
+
+        conn.commit()
+        return jsonify({'success': True, 'message': 'Global RPC settings updated'})
+
+    except Exception as e:
+        print(f"Error saving admin RPC settings: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)

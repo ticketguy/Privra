@@ -40,10 +40,52 @@ if [ ! -f /etc/opendkim/keys/$MAIL_DOMAIN/mail.private ]; then
     echo ""
 fi
 
-# Fix OpenDKIM permissions
-chown -R root:opendkim /etc/opendkim
+# Fix OpenDKIM permissions (strict security requirements)
+# OpenDKIM requires private key to be owned by a single user with no group access
+chown -R opendkim:opendkim /etc/opendkim
 chmod -R 750 /etc/opendkim
-chmod 640 /etc/opendkim/keys/$MAIL_DOMAIN/mail.private
+chmod 600 /etc/opendkim/keys/$MAIL_DOMAIN/mail.private
+chown opendkim:opendkim /etc/opendkim/keys/$MAIL_DOMAIN/mail.private
+
+# Generate OpenDKIM configuration with actual domain
+echo "Generating OpenDKIM configuration for $MAIL_DOMAIN..."
+cat > /etc/opendkim.conf <<EOF
+# OpenDKIM Configuration
+
+# Log to syslog
+Syslog yes
+SyslogSuccess yes
+LogWhy yes
+
+# Required to use local socket with MTAs that access the socket as a non-
+# privileged user (e.g. Postfix)
+UMask 002
+
+# Sign for $MAIL_DOMAIN with selector "mail"
+Domain $MAIL_DOMAIN
+Selector mail
+KeyFile /etc/opendkim/keys/$MAIL_DOMAIN/mail.private
+
+# Hosts to ignore when verifying signatures
+InternalHosts /etc/opendkim/TrustedHosts
+
+# Commonly-used options
+Canonicalization relaxed/simple
+Mode sv
+SubDomains no
+AutoRestart yes
+AutoRestartRate 10/1M
+Background yes
+DNSTimeout 5
+SignatureAlgorithm rsa-sha256
+
+# Socket for Postfix
+Socket inet:8891@localhost
+EOF
+
+# Set ownership of config file to opendkim user
+chown opendkim:opendkim /etc/opendkim.conf
+chmod 644 /etc/opendkim.conf
 
 echo "Postfix configured. Starting services..."
 

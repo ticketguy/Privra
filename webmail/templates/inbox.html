@@ -3,88 +3,597 @@
 {% block title %}Inbox - Privra Webmail{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h2>Inbox ({{ emails|length }})</h2>
-        <a href="{{ url_for('compose') }}" class="btn btn-success">Compose New</a>
+<style>
+    .inbox-layout {
+        display: flex;
+        gap: 2rem;
+        height: calc(100vh - 200px);
+    }
+
+    /* Folder Sidebar - Enhanced Glassmorphism */
+    .folder-sidebar {
+        width: 250px;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        overflow-y: auto;
+    }
+
+    .folder-sidebar h3 {
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+        color: white;
+        font-weight: 600;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .folder-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .folder-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-bottom: 0.5rem;
+        text-decoration: none;
+        color: white;
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .folder-item:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateX(5px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .folder-item.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-weight: 600;
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+    }
+
+    .folder-icon {
+        font-size: 1.2rem;
+    }
+
+    .folder-name {
+        flex: 1;
+    }
+
+    .folder-count {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 0.15rem 0.5rem;
+        border-radius: 10px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .new-folder-btn {
+        width: 100%;
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+    }
+
+    .new-folder-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+    }
+
+    /* Email List Area - Enhanced Glassmorphism */
+    .email-area {
+        flex: 1;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        overflow-y: auto;
+    }
+
+    .email-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .email-header h2 {
+        font-size: 1.5rem;
+        color: white;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .compose-btn {
+        padding: 0.75rem 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+        display: inline-block;
+    }
+
+    .compose-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+    }
+
+    .email-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .email-item {
+        padding: 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.3s ease;
+        border-radius: 12px;
+        margin-bottom: 0.5rem;
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .email-item:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateX(8px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+
+    .email-item a {
+        color: white;
+        text-decoration: none;
+        flex: 1;
+    }
+
+    .email-subject {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+        color: white;
+    }
+
+    .email-from {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.9rem;
+    }
+
+    .email-date {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.85rem;
+        white-space: nowrap;
+        margin-left: 1rem;
+    }
+
+    .email-labels {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .label-badge {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: 10px;
+        font-weight: 600;
+    }
+
+    /* Verification Badges */
+    .verification-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.7rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-weight: 600;
+        margin-left: 0.5rem;
+        color: white;
+    }
+
+    .sender-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .sender-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .sender-avatar-placeholder {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        font-weight: 600;
+        font-size: 0.9rem;
+        flex-shrink: 0;
+    }
+
+    .sender-details {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .no-emails {
+        text-align: center;
+        color: var(--text-tertiary);
+        padding: 3rem;
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+        .inbox-layout {
+            flex-direction: column;
+            height: auto;
+        }
+
+        .folder-sidebar {
+            width: 100%;
+            margin-bottom: 1rem;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .folder-sidebar.expanded {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .folder-sidebar h3 {
+            cursor: pointer;
+            padding: 0.75rem;
+            margin: -0.75rem -0.75rem 1rem -0.75rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            user-select: none;
+        }
+
+        .folder-sidebar h3::after {
+            content: ' ▼';
+            float: right;
+            font-size: 0.8rem;
+        }
+
+        .folder-sidebar.expanded h3::after {
+            content: ' ▲';
+        }
+
+        .email-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .email-header h2 {
+            font-size: 1.3rem;
+        }
+
+        .email-header div {
+            width: 100%;
+        }
+
+        .compose-btn {
+            width: 100%;
+            text-align: center;
+            justify-content: center;
+        }
+
+        .email-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .email-item a {
+            width: 100%;
+        }
+
+        .email-date {
+            margin-top: 0.5rem;
+            margin-left: 0 !important;
+        }
+
+        .sender-details {
+            width: 100%;
+        }
+
+        .verification-badge {
+            font-size: 0.65rem;
+            padding: 0.15rem 0.5rem;
+            margin-top: 0.25rem;
+        }
+
+        .sender-avatar,
+        .sender-avatar-placeholder {
+            width: 32px;
+            height: 32px;
+            font-size: 0.8rem;
+        }
+
+        .new-folder-btn {
+            width: 100%;
+        }
+    }
+</style>
+
+<div class="inbox-layout">
+    <!-- Folder Sidebar -->
+    <div class="folder-sidebar" id="folder-sidebar">
+        <h3 onclick="toggleFolderSidebar()">📂 Folders</h3>
+        <ul class="folder-list" id="folder-list">
+            <!-- Folders will be loaded via JavaScript -->
+        </ul>
+        <button class="new-folder-btn" onclick="showNewFolderModal()">
+            + New Label
+        </button>
     </div>
 
-    <!-- Category Filters -->
-    <div style="margin-bottom: 1.5rem; padding: 10px; background: #f8f9fa; border-radius: 5px;">
-        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-            <span style="font-weight: bold; margin-right: 5px;">Categories:</span>
-            <a href="{{ url_for('inbox', category='all') }}"
-               class="category-filter {% if current_category == 'all' %}active{% endif %}">
-                All
-            </a>
-            {% for key, name in categories.items() %}
-            <a href="{{ url_for('inbox', category=key) }}"
-               class="category-filter {% if current_category == key %}active{% endif %}">
-                {{ name }}
-            </a>
-            {% endfor %}
+    <!-- Email List Area -->
+    <div class="email-area">
+        <div class="email-header">
+            <h2 id="current-folder-name">Inbox</h2>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="compose-btn" onclick="autoLabelEmails()" id="auto-label-btn" title="Automatically categorize emails using AI">
+                    🤖 Auto-Label
+                </button>
+                <a href="{{ url_for('compose') }}" class="compose-btn">✏️ Compose</a>
+            </div>
+        </div>
+
+        {% if emails %}
+            <ul class="email-list">
+                {% for email in emails %}
+                    <li class="email-item">
+                        <a href="{{ url_for('view_email', email_id=email.id) }}" style="display: flex; align-items: center; gap: 1rem;">
+                            <!-- Avatar -->
+                            {% if email.verification.avatar_url %}
+                                <img src="{{ email.verification.avatar_url }}" class="sender-avatar" alt="Avatar">
+                            {% else %}
+                                <div class="sender-avatar-placeholder">
+                                    {{ email.from[0]|upper }}
+                                </div>
+                            {% endif %}
+
+                            <div class="sender-details">
+                                <div class="email-subject">
+                                    {{ email.subject }}
+                                </div>
+                                <div class="email-from">
+                                    {% if email.verification.display_name %}
+                                        {{ email.verification.display_name }} <span style="opacity: 0.7;">&lt;{{ email.from }}&gt;</span>
+                                    {% else %}
+                                        {{ email.from }}
+                                    {% endif %}
+
+                                    <!-- Verification Badges -->
+                                    {% for badge in email.verification.badges %}
+                                        <span class="verification-badge" style="background: {{ badge.color }};">
+                                            {{ badge.icon }} {{ badge.text }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                                <!-- Labels will be added here via JS -->
+                                <div class="email-labels" id="labels-{{ email.id }}"></div>
+                            </div>
+                        </a>
+                        <div class="email-date">{{ email.date }}</div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="no-emails">
+                No emails in this folder. Start by composing a new email!
+            </p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- New Folder Modal -->
+<div id="new-folder-modal" style="display: none;">
+    <div style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(5px);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    ">
+        <div style="
+            background: var(--bg-card);
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        ">
+            <h3 style="margin-bottom: 1.5rem;">Create New Label</h3>
+            <form id="new-folder-form">
+                <div class="form-group">
+                    <label for="folder-name">Label Name</label>
+                    <input type="text" id="folder-name" name="folder_name" placeholder="e.g., Work, Personal" required
+                           style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary);">
+                </div>
+                <div class="form-group">
+                    <label for="folder-icon">Icon (emoji)</label>
+                    <input type="text" id="folder-icon" name="icon" placeholder="📁" maxlength="2"
+                           style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary);">
+                </div>
+                <div class="form-group">
+                    <label for="folder-color">Color</label>
+                    <input type="color" id="folder-color" name="color" value="#667eea"
+                           style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px;">
+                </div>
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Create</button>
+                    <button type="button" onclick="closeNewFolderModal()" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+                </div>
+            </form>
         </div>
     </div>
-
-    <style>
-    .category-filter {
-        padding: 5px 12px;
-        background: white;
-        border: 1px solid #dee2e6;
-        border-radius: 15px;
-        text-decoration: none;
-        color: #495057;
-        font-size: 0.9em;
-        transition: all 0.2s;
-    }
-    .category-filter:hover {
-        background: #e9ecef;
-        border-color: #007bff;
-    }
-    .category-filter.active {
-        background: #007bff;
-        color: white;
-        border-color: #007bff;
-    }
-    .category-badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 10px;
-        font-size: 0.75em;
-        font-weight: bold;
-        margin-left: 8px;
-    }
-    .category-priority { background: #dc3545; color: white; }
-    .category-social { background: #17a2b8; color: white; }
-    .category-updates { background: #6c757d; color: white; }
-    .category-promotions { background: #ffc107; color: #212529; }
-    .category-spam { background: #e83e8c; color: white; }
-    .category-inbox { background: #e9ecef; color: #495057; }
-    </style>
-
-    {% if emails %}
-        <ul class="email-list">
-            {% for email in emails %}
-                <li class="email-item">
-                    <a href="{{ url_for('view_email', email_id=email.id) }}">
-                        <div class="email-subject">
-                            {{ email.subject }}
-                            <span class="category-badge category-{{ email.category }}">{{ email.category_name }}</span>
-                        </div>
-                        <div class="email-from">From: {{ email.from }}</div>
-                    </a>
-                    <div class="email-date">{{ email.date }}</div>
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p style="text-align: center; color: #999; padding: 3rem;">
-            {% if current_category != 'all' %}
-                No emails in {{ categories[current_category] }} category.
-            {% else %}
-                No emails in inbox. Start by composing a new email!
-            {% endif %}
-        </p>
-    {% endif %}
 </div>
+
+<script>
+    // Load folders on page load
+    async function loadFolders() {
+        try {
+            const response = await fetch('/folders');
+            const data = await response.json();
+
+            if (data.success) {
+                const folderList = document.getElementById('folder-list');
+                folderList.innerHTML = '';
+
+                data.folders.forEach(folder => {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.href = `?folder=${folder.type}`;
+                    a.className = 'folder-item';
+
+                    // Check if current folder
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const currentFolder = urlParams.get('folder') || 'inbox';
+                    if (folder.type === currentFolder) {
+                        a.classList.add('active');
+                        document.getElementById('current-folder-name').textContent = folder.name;
+                    }
+
+                    a.innerHTML = `
+                        <span class="folder-icon">${folder.icon}</span>
+                        <span class="folder-name">${folder.name}</span>
+                        <span class="folder-count">0</span>
+                    `;
+
+                    li.appendChild(a);
+                    folderList.appendChild(li);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading folders:', error);
+        }
+    }
+
+    function showNewFolderModal() {
+        document.getElementById('new-folder-modal').style.display = 'block';
+    }
+
+    function closeNewFolderModal() {
+        document.getElementById('new-folder-modal').style.display = 'none';
+        document.getElementById('new-folder-form').reset();
+    }
+
+    document.getElementById('new-folder-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(e.target);
+
+        try {
+            const response = await fetch('/folders/create', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                closeNewFolderModal();
+                loadFolders(); // Reload folders
+                alert('Label created successfully!');
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            alert('Error creating label: ' + error.message);
+        }
+    });
+
+    // Toggle folder sidebar on mobile
+    function toggleFolderSidebar() {
+        const sidebar = document.getElementById('folder-sidebar');
+        if (window.innerWidth <= 768) {
+            sidebar.classList.toggle('expanded');
+        }
+    }
+
+    // Auto-label emails with AI
+    async function autoLabelEmails() {
+        const btn = document.getElementById('auto-label-btn');
+        const originalText = btn.textContent;
+
+        // Disable button and show loading
+        btn.disabled = true;
+        btn.textContent = '🤖 Labeling...';
+        btn.style.opacity = '0.6';
+
+        try {
+            const response = await fetch('/email/auto-label', {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                alert(`✓ ${result.message}\n\nLabeled ${result.labeled} emails:\n• ${result.spam} marked as spam\n• ${result.important} marked as important`);
+                // Reload page to show updated labels
+                window.location.reload();
+            } else {
+                alert('Error: ' + (result.error || 'Failed to auto-label emails'));
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        } finally {
+            // Re-enable button
+            btn.disabled = false;
+            btn.textContent = originalText;
+            btn.style.opacity = '1';
+        }
+    }
+
+    // Load folders on page load
+    loadFolders();
+</script>
 {% endblock %}
