@@ -526,7 +526,13 @@ def register():
             return redirect(url_for('show_recovery_key'))
 
         except Exception as e:
+            import traceback
             print(f"Registration error: {e}")
+            traceback.print_exc()
+            # Log more detailed error for debugging
+            error_msg = str(e)
+            if 'consent_settings' in error_msg.lower():
+                print("ERROR: consent_settings table might not exist. Run init_db.py to create required tables.")
             flash('Error creating account. Please try again.', 'error')
             return render_template('register.html')
 

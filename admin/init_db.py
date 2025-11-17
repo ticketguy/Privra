@@ -97,6 +97,66 @@ def init_database():
         )
     """)
 
+    # Create consent_settings table (required for user registration)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS consent_settings (
+            user_email VARCHAR(255) PRIMARY KEY,
+            require_consent BOOLEAN DEFAULT FALSE,
+            require_payment BOOLEAN DEFAULT FALSE,
+            payment_amount DECIMAL(10, 2) DEFAULT 0.00,
+            payment_address VARCHAR(500),
+            whitelist_mode BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_email) REFERENCES users(email) ON DELETE CASCADE
+        )
+    """)
+
+    # Create sender_whitelist table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS sender_whitelist (
+            id SERIAL PRIMARY KEY,
+            recipient_email VARCHAR(255) NOT NULL,
+            sender_email VARCHAR(255) NOT NULL,
+            sender_domain VARCHAR(255),
+            note TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (recipient_email) REFERENCES users(email) ON DELETE CASCADE,
+            UNIQUE(recipient_email, sender_email)
+        )
+    """)
+
+    # Create sender_blacklist table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS sender_blacklist (
+            id SERIAL PRIMARY KEY,
+            recipient_email VARCHAR(255) NOT NULL,
+            sender_email VARCHAR(255),
+            sender_domain VARCHAR(255),
+            reason TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (recipient_email) REFERENCES users(email) ON DELETE CASCADE
+        )
+    """)
+
+    # Create consent_requests table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS consent_requests (
+            id SERIAL PRIMARY KEY,
+            recipient_email VARCHAR(255) NOT NULL,
+            sender_email VARCHAR(255) NOT NULL,
+            token VARCHAR(100) UNIQUE NOT NULL,
+            status VARCHAR(20) DEFAULT 'pending',
+            email_subject TEXT,
+            email_preview TEXT,
+            payment_txid VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP,
+            responded_at TIMESTAMP,
+            FOREIGN KEY (recipient_email) REFERENCES users(email) ON DELETE CASCADE
+        )
+    """)
+
     # Insert default domain
     domain = os.getenv('MAIL_DOMAIN', 'privra.xyz')
     cur.execute(
