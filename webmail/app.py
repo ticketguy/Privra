@@ -32,6 +32,7 @@ from nft_verification_service import nft_service
 from reputation_service import reputation_service
 from wallet_service import wallet_service
 from folder_service import folder_service
+from ai_labeling import ai_labeling_service
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -1567,6 +1568,182 @@ def unlabel_email(message_id):
 
     except Exception as e:
         print(f"Error unlabeling email: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============================================
+# AI Email Labeling Routes
+# ============================================
+
+@app.route('/email/auto-label', methods=['POST'])
+def auto_label_emails():
+    """Automatically label emails in inbox using AI"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    try:
+        # Connect to IMAP
+        mail = connect_imap(session['email'], session['password'])
+        if not mail:
+            return jsonify({'success': False, 'error': 'Failed to connect to mail server'}), 500
+
+        mail.select('INBOX')
+        status, messages = mail.search(None, 'ALL')
+        email_ids = messages[0].split()
+
+        labeled_count = 0
+        spam_count = 0
+        important_count = 0
+
+        for email_id in email_ids:
+            try:
+                # Fetch email
+                status, msg_data = mail.fetch(email_id, '(RFC822)')
+                email_body = msg_data[0][1]
+                email_message = email.message_from_bytes(email_body)
+
+                # Get subject and sender
+                subject = email_message.get('Subject', '')
+                if subject:
+                    subject, encoding = decode_header(subject)[0]
+                    if isinstance(subject, bytes):
+                        subject = subject.decode(encoding or 'utf-8', errors='ignore')
+
+                from_addr = email_message.get('From', '')
+                if from_addr:
+                    from_header = decode_header(from_addr)[0]
+                    if isinstance(from_header[0], bytes):
+                        from_addr = from_header[0].decode(from_header[1] or 'utf-8', errors='ignore')
+
+                # Get email body for better analysis
+                body = ''
+                if email_message.is_multipart():
+                    for part in email_message.walk():
+                        if part.get_content_type() == 'text/plain':
+                            try:
+                                payload = part.get_payload(decode=True)
+                                if payload:
+                                    body = payload.decode('utf-8', errors='ignore')
+                                    break
+                            except:
+                                pass
+                else:
+                    try:
+                        payload = email_message.get_payload(decode=True)
+                        if payload:
+                            body = payload.decode('utf-8', errors='ignore')
+                    except:
+                        pass
+
+                # Limit body length for analysis
+                body = body[:1000] if body else ''
+
+                # Analyze with AI
+                category = ai_labeling_service.categorize_email(from_addr, subject, body)
+
+                # Add label if not inbox
+                if category != 'inbox':
+                    message_id = email_id.decode()
+                    folder_service.add_label_to_email(
+                        session['email'],
+                        message_id,
+                        category,
+                        ai_generated=True
+                    )
+                    labeled_count += 1
+
+                    if category == 'spam':
+                        spam_count += 1
+                    elif category == 'important':
+                        important_count += 1
+
+            except Exception as e:
+                print(f"Error analyzing email {email_id}: {e}")
+                continue
+
+        mail.logout()
+
+        return jsonify({
+            'success': True,
+            'message': f'Labeled {labeled_count} emails ({spam_count} spam, {important_count} important)',
+            'labeled': labeled_count,
+            'spam': spam_count,
+            'important': important_count
+        })
+
+    except Exception as e:
+        print(f"Error in auto-labeling: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/email/<message_id>/suggest-labels', methods=['GET'])
+def suggest_labels(message_id):
+    """Get AI suggested labels for a specific email"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    try:
+        # Connect to IMAP
+        mail = connect_imap(session['email'], session['password'])
+        if not mail:
+            return jsonify({'success': False, 'error': 'Failed to connect to mail server'}), 500
+
+        mail.select('INBOX')
+
+        # Fetch the specific email
+        status, msg_data = mail.fetch(message_id.encode(), '(RFC822)')
+        email_body = msg_data[0][1]
+        email_message = email.message_from_bytes(email_body)
+
+        # Get subject and sender
+        subject = email_message.get('Subject', '')
+        if subject:
+            subject, encoding = decode_header(subject)[0]
+            if isinstance(subject, bytes):
+                subject = subject.decode(encoding or 'utf-8', errors='ignore')
+
+        from_addr = email_message.get('From', '')
+        if from_addr:
+            from_header = decode_header(from_addr)[0]
+            if isinstance(from_header[0], bytes):
+                from_addr = from_header[0].decode(from_header[1] or 'utf-8', errors='ignore')
+
+        # Get email body
+        body = ''
+        if email_message.is_multipart():
+            for part in email_message.walk():
+                if part.get_content_type() == 'text/plain':
+                    try:
+                        payload = part.get_payload(decode=True)
+                        if payload:
+                            body = payload.decode('utf-8', errors='ignore')
+                            break
+                    except:
+                        pass
+        else:
+            try:
+                payload = email_message.get_payload(decode=True)
+                if payload:
+                    body = payload.decode('utf-8', errors='ignore')
+            except:
+                pass
+
+        body = body[:1000] if body else ''
+
+        # Analyze with AI
+        labels = ai_labeling_service.analyze_email(from_addr, subject, body)
+        category = ai_labeling_service.categorize_email(from_addr, subject, body)
+
+        mail.logout()
+
+        return jsonify({
+            'success': True,
+            'labels': labels,
+            'category': category,
+            'from': from_addr,
+            'subject': subject
+        })
+
+    except Exception as e:
+        print(f"Error suggesting labels: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # ============================================

@@ -268,7 +268,12 @@
     <div class="email-area">
         <div class="email-header">
             <h2 id="current-folder-name">Inbox</h2>
-            <a href="{{ url_for('compose') }}" class="compose-btn">✏️ Compose</a>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="compose-btn" onclick="autoLabelEmails()" id="auto-label-btn" title="Automatically categorize emails using AI">
+                    🤖 Auto-Label
+                </button>
+                <a href="{{ url_for('compose') }}" class="compose-btn">✏️ Compose</a>
+            </div>
         </div>
 
         {% if emails %}
@@ -441,6 +446,40 @@
             alert('Error creating label: ' + error.message);
         }
     });
+
+    // Auto-label emails with AI
+    async function autoLabelEmails() {
+        const btn = document.getElementById('auto-label-btn');
+        const originalText = btn.textContent;
+
+        // Disable button and show loading
+        btn.disabled = true;
+        btn.textContent = '🤖 Labeling...';
+        btn.style.opacity = '0.6';
+
+        try {
+            const response = await fetch('/email/auto-label', {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                alert(`✓ ${result.message}\n\nLabeled ${result.labeled} emails:\n• ${result.spam} marked as spam\n• ${result.important} marked as important`);
+                // Reload page to show updated labels
+                window.location.reload();
+            } else {
+                alert('Error: ' + (result.error || 'Failed to auto-label emails'));
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        } finally {
+            // Re-enable button
+            btn.disabled = false;
+            btn.textContent = originalText;
+            btn.style.opacity = '1';
+        }
+    }
 
     // Load folders on page load
     loadFolders();
