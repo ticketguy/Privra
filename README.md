@@ -99,6 +99,33 @@ Until port 25 is unblocked:
 
 Once unblocked, your server is **fully independent** with no external dependencies.
 
+## Documentation
+
+**Comprehensive documentation** available in the [`docs/`](docs/) directory:
+
+- [System Overview](docs/SYSTEM_OVERVIEW.md) - Complete technical documentation
+- [Deployment Guide](docs/deployment/DEPLOY.md) - Production deployment
+- [Troubleshooting](docs/troubleshooting/) - Common issues and fixes
+- [Architecture](docs/architecture/) - System design and encryption
+
+## Troubleshooting
+
+### Webmail Container Won't Start
+
+If you see import errors in webmail logs:
+```bash
+./scripts/fix-webmail.sh
+```
+
+This rebuilds the webmail container with the latest code.
+
+### Other Issues
+
+Check the [troubleshooting directory](docs/troubleshooting/) for:
+- DKIM configuration issues
+- SSL certificate problems
+- Database connection errors
+
 ## Support
 
 Built with simplicity in mind. If it breaks, it's easy to fix.
