@@ -28,7 +28,7 @@ from email_categorizer import EmailCategorizer
 from werkzeug.middleware.proxy_fix import ProxyFix
 import sys
 sys.path.append('/app')
-from nft_verification_service import nft_service
+from nft_verification_service import nft_verification_service as nft_service
 from reputation_service import reputation_service
 from wallet_service import wallet_service
 from folder_service import folder_service
