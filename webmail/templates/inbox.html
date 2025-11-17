@@ -248,14 +248,96 @@
         .folder-sidebar {
             width: 100%;
             margin-bottom: 1rem;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .folder-sidebar.expanded {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .folder-sidebar h3 {
+            cursor: pointer;
+            padding: 0.75rem;
+            margin: -0.75rem -0.75rem 1rem -0.75rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            user-select: none;
+        }
+
+        .folder-sidebar h3::after {
+            content: ' ▼';
+            float: right;
+            font-size: 0.8rem;
+        }
+
+        .folder-sidebar.expanded h3::after {
+            content: ' ▲';
+        }
+
+        .email-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .email-header h2 {
+            font-size: 1.3rem;
+        }
+
+        .email-header div {
+            width: 100%;
+        }
+
+        .compose-btn {
+            width: 100%;
+            text-align: center;
+            justify-content: center;
+        }
+
+        .email-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .email-item a {
+            width: 100%;
+        }
+
+        .email-date {
+            margin-top: 0.5rem;
+            margin-left: 0 !important;
+        }
+
+        .sender-details {
+            width: 100%;
+        }
+
+        .verification-badge {
+            font-size: 0.65rem;
+            padding: 0.15rem 0.5rem;
+            margin-top: 0.25rem;
+        }
+
+        .sender-avatar,
+        .sender-avatar-placeholder {
+            width: 32px;
+            height: 32px;
+            font-size: 0.8rem;
+        }
+
+        .new-folder-btn {
+            width: 100%;
         }
     }
 </style>
 
 <div class="inbox-layout">
     <!-- Folder Sidebar -->
-    <div class="folder-sidebar">
-        <h3>📂 Folders</h3>
+    <div class="folder-sidebar" id="folder-sidebar">
+        <h3 onclick="toggleFolderSidebar()">📂 Folders</h3>
         <ul class="folder-list" id="folder-list">
             <!-- Folders will be loaded via JavaScript -->
         </ul>
@@ -446,6 +528,14 @@
             alert('Error creating label: ' + error.message);
         }
     });
+
+    // Toggle folder sidebar on mobile
+    function toggleFolderSidebar() {
+        const sidebar = document.getElementById('folder-sidebar');
+        if (window.innerWidth <= 768) {
+            sidebar.classList.toggle('expanded');
+        }
+    }
 
     // Auto-label emails with AI
     async function autoLabelEmails() {

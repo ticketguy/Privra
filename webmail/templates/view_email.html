@@ -68,6 +68,52 @@
         font-weight: 600;
         color: white;
     }
+
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+        .sender-header {
+            padding: 1rem;
+        }
+
+        .sender-avatar-large,
+        .sender-avatar-placeholder-large {
+            width: 48px;
+            height: 48px;
+            font-size: 1.2rem;
+        }
+
+        .sender-name {
+            font-size: 1rem;
+        }
+
+        .sender-email {
+            font-size: 0.85rem;
+        }
+
+        .verification-badge {
+            font-size: 0.7rem;
+            padding: 0.25rem 0.6rem;
+        }
+
+        .email-header h2 {
+            font-size: 1.3rem;
+            word-break: break-word;
+        }
+
+        .email-meta {
+            font-size: 0.9rem;
+        }
+
+        .email-body {
+            font-size: 0.95rem;
+            padding: 1rem;
+        }
+
+        .card > div[style*="margin-bottom"] .btn {
+            width: 100%;
+            text-align: center;
+        }
+    }
 </style>
 
 <div class="card">

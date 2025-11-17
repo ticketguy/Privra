@@ -3,6 +3,26 @@
 {% block title %}Compose Email - Privra Webmail{% endblock %}
 
 {% block content %}
+<style>
+    @media (max-width: 768px) {
+        .card h2 {
+            font-size: 1.3rem;
+        }
+
+        .form-group textarea {
+            min-height: 250px;
+        }
+
+        .card form > div[style*="display: flex"] {
+            flex-direction: column !important;
+        }
+
+        .card form > div[style*="display: flex"] .btn {
+            width: 100%;
+        }
+    }
+</style>
+
 <div class="card">
     <h2 style="margin-bottom: 1.5rem;">Compose New Email</h2>
 
