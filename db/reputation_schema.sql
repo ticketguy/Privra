@@ -1,5 +1,5 @@
 -- Reputation System Database Schema
--- Run this after initial database setup
+-- Compatible with PostgreSQL 9.6+
 
 -- User reputation tracking
 CREATE TABLE IF NOT EXISTS user_reputation (
@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS abuse_reports (
     status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processed', 'dismissed', 'false_report')),
     processed_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(reporter_email, reported_email, created_at::DATE)
+    report_date DATE DEFAULT CURRENT_DATE,
+    UNIQUE(reporter_email, reported_email, report_date)
 );
 
 -- Bounce tracking
@@ -112,24 +113,6 @@ CREATE INDEX IF NOT EXISTS idx_bounce_tracking_user ON bounce_tracking(user_emai
 CREATE INDEX IF NOT EXISTS idx_spam_trap_hits_user ON spam_trap_hits(user_email);
 CREATE INDEX IF NOT EXISTS idx_velocity_violations_user ON velocity_violations(user_email);
 
--- Function to automatically create reputation record for new users
-CREATE OR REPLACE FUNCTION create_reputation_for_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO user_reputation (user_email)
-    VALUES (NEW.email)
-    ON CONFLICT (user_email) DO NOTHING;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Trigger to create reputation when user is created
-DROP TRIGGER IF EXISTS trigger_create_reputation ON users;
-CREATE TRIGGER trigger_create_reputation
-    AFTER INSERT ON users
-    FOR EACH ROW
-    EXECUTE FUNCTION create_reputation_for_new_user();
-
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -146,9 +129,34 @@ CREATE TRIGGER trigger_update_reputation_timestamp
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Insert some example spam traps (customize these for your domain)
-INSERT INTO spam_traps (trap_email, trap_type) VALUES
-    ('noreply@' || (SELECT domain FROM domains LIMIT 1), 'honeypot'),
-    ('abuse@' || (SELECT domain FROM domains LIMIT 1), 'honeypot'),
-    ('postmaster@' || (SELECT domain FROM domains LIMIT 1), 'honeypot')
+-- Note: The trigger for auto-creating reputation on user insert requires the 'users' table
+-- If you have a users table, uncomment and run this:
+/*
+CREATE OR REPLACE FUNCTION create_reputation_for_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO user_reputation (user_email)
+    VALUES (NEW.email)
+    ON CONFLICT (user_email) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_create_reputation ON users;
+CREATE TRIGGER trigger_create_reputation
+    AFTER INSERT ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION create_reputation_for_new_user();
+*/
+
+-- Insert some default spam traps
+-- Customize these for your domain(s)
+INSERT INTO spam_traps (trap_email, trap_type)
+VALUES
+    ('noreply@example.com', 'honeypot'),
+    ('abuse@example.com', 'honeypot'),
+    ('postmaster@example.com', 'honeypot')
 ON CONFLICT (trap_email) DO NOTHING;
+
+-- Success message
+SELECT 'Reputation system schema created successfully!' AS status;
