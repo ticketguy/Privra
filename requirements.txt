@@ -1,0 +1,41 @@
+# Privra Mail Server - Python Dependencies
+
+# Web Framework
+Flask==2.3.3
+Werkzeug==2.3.7
+
+# Database
+psycopg2-binary==2.9.7
+
+# Cryptography
+pycryptodome==3.18.0
+bcrypt==4.0.1
+
+# Image Processing
+Pillow==10.0.0
+
+# Blockchain Libraries
+solders==0.18.1
+solana==0.30.2
+web3==6.10.0
+eth-account==0.9.0
+eth-utils==2.2.0
+
+# HTTP Requests
+requests==2.31.0
+
+# Environment Variables
+python-dotenv==1.0.0
+
+# Date/Time
+python-dateutil==2.8.2
+
+# Email Utilities
+email-validator==2.0.0
+
+# Async Support
+aiohttp==3.8.5
+
+# Development Tools (optional)
+black==23.7.0
+flake8==6.1.0
