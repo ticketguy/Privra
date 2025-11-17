@@ -4,8 +4,11 @@ Complete documentation for the Privra secure mail server system.
 
 ## Quick Start
 
-1. **Initial Setup**: See [Deployment Guide](deployment/DEPLOY.md)
-2. **Troubleshooting**: See [Troubleshooting](troubleshooting/) folder
+```bash
+./deploy.sh
+```
+
+One command deploys everything! For details, see [Deployment Guide](deployment/DEPLOY.md)
 
 ## Documentation Structure
 
@@ -51,25 +54,40 @@ Privra Mail is a privacy-focused email server with:
 
 ## Common Tasks
 
-### Start the System
+### Deploy/Start the System
 ```bash
-docker compose up -d
+./deploy.sh
 ```
 
-### Stop the System
+### Fix Issues
 ```bash
-docker compose down
+./deploy.sh fix
+```
+
+### Check Status
+```bash
+./deploy.sh status
 ```
 
 ### View Logs
 ```bash
-docker compose logs -f [service_name]
+./deploy.sh logs           # All services
+./deploy.sh logs webmail   # Specific service
 ```
 
-### Rebuild a Service
+### Restart Services
 ```bash
-docker compose build --no-cache [service_name]
-docker compose up -d [service_name]
+./deploy.sh restart
+```
+
+### Rebuild Everything
+```bash
+./deploy.sh rebuild
+```
+
+### Stop the System
+```bash
+./deploy.sh stop
 ```
 
 ## Support

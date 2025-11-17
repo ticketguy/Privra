@@ -7,12 +7,17 @@ A simple, reliable mail server built from scratch. **Plug and play** - no comple
 ```bash
 git clone https://github.com/ticketguy/Privra.git
 cd Privra
-cp .env.example .env
-nano .env  # Edit your domain and passwords
-./setup.sh
+./deploy.sh
 ```
 
-**That's it!** Your mail server is ready in 5 minutes.
+**That's it!** The script will:
+1. Check Docker installation
+2. Create .env from template (edit and run again)
+3. Initialize database
+4. Start all services
+5. Show access URLs
+
+Your mail server is ready in 5 minutes.
 
 ## Features
 
@@ -53,8 +58,26 @@ nano .env  # Edit your domain and passwords
 
 ## Management
 
+### Using Deploy Script
+```bash
+# View status
+./deploy.sh status
+
+# View logs
+./deploy.sh logs
+
+# Fix issues (rebuilds webmail, checks DKIM, etc)
+./deploy.sh fix
+
+# Restart services
+./deploy.sh restart
+
+# Rebuild everything
+./deploy.sh rebuild
+```
+
 ### Via Admin Panel (Easy)
-Go to https://mail.yourdomain.com and manage users with the web interface.
+Go to https://mail.yourdomain.com/warofbest and manage users with the web interface.
 
 ### Via Command Line
 ```bash
@@ -66,9 +89,6 @@ docker compose exec admin python manage.py deluser user@domain.com
 
 # Change password
 docker compose exec admin python manage.py passwd user@domain.com newpassword
-
-# View logs
-docker compose logs -f
 ```
 
 ## What's Next?
@@ -110,21 +130,33 @@ Once unblocked, your server is **fully independent** with no external dependenci
 
 ## Troubleshooting
 
-### Webmail Container Won't Start
+### Any Issues? One Command to Fix
 
-If you see import errors in webmail logs:
 ```bash
-./scripts/fix-webmail.sh
+./deploy.sh fix
 ```
 
-This rebuilds the webmail container with the latest code.
+This automatically:
+- Rebuilds webmail container
+- Fixes SSL certificate chains
+- Checks DKIM configuration
+- Restarts all services
 
-### Other Issues
+### Other Common Commands
+
+```bash
+./deploy.sh status    # Check what's running
+./deploy.sh logs      # View all logs
+./deploy.sh rebuild   # Nuclear option - rebuild everything
+```
+
+### Detailed Troubleshooting
 
 Check the [troubleshooting directory](docs/troubleshooting/) for:
 - DKIM configuration issues
 - SSL certificate problems
 - Database connection errors
+- Git conflict resolution
 
 ## Support
 

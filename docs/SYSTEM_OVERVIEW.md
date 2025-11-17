@@ -225,33 +225,57 @@ Place certificates in `certs/`:
 - `certs/mail.crt` - SSL certificate
 - `certs/mail.key` - Private key
 
-Use `fix-ssl-cert.sh` to expand certificate chains if needed.
+Run `./deploy.sh fix` to automatically expand certificate chains if needed.
 
 ### DKIM Keys
 
 Generated automatically in `dkim-keys/` volume.
 
-Use `check-dkim.sh` to verify DKIM configuration.
+Use `./deploy.sh fix` to verify DKIM configuration (displays DNS record to add).
 
 ## Maintenance
 
-### View Logs
+### Using Deploy Script (Recommended)
+
 ```bash
-# All services
+# View status
+./deploy.sh status
+
+# View logs (all services)
+./deploy.sh logs
+
+# View logs (specific service)
+./deploy.sh logs webmail
+
+# Fix issues automatically
+./deploy.sh fix
+
+# Restart all services
+./deploy.sh restart
+
+# Rebuild everything
+./deploy.sh rebuild
+
+# Stop all services
+./deploy.sh stop
+
+# Start all services
+./deploy.sh start
+```
+
+### Direct Docker Commands
+
+If you prefer direct control:
+
+```bash
+# View logs
 docker compose logs -f
-
-# Specific service
-docker compose logs -f postfix
 docker compose logs -f webmail
-```
 
-### Restart Service
-```bash
+# Restart service
 docker compose restart [service]
-```
 
-### Rebuild Service
-```bash
+# Rebuild service
 docker compose build --no-cache [service]
 docker compose up -d [service]
 ```
@@ -296,18 +320,42 @@ docker compose exec postfix postsuper -d ALL
 
 ## Troubleshooting
 
-See [docs/troubleshooting/](troubleshooting/) for common issues and fixes.
+See [troubleshooting/](troubleshooting/) directory for detailed guides.
+
+### Quick Fix
+
+For most issues, run:
+
+```bash
+./deploy.sh fix
+```
+
+This automatically:
+- Rebuilds webmail container
+- Fixes SSL certificate chains
+- Checks and displays DKIM configuration
+- Restarts all services
 
 ### Common Issues
 
-1. **Webmail won't start**: Rebuild container with `./rebuild-webmail.sh`
-2. **DKIM not working**: Run `./check-dkim.sh` and check DNS records
-3. **SSL errors**: Run `./fix-ssl-cert.sh` to expand certificate chain
-4. **Email not delivering**: Check Postfix logs and email queue
+1. **Webmail won't start**: Run `./deploy.sh fix`
+2. **DKIM not working**: Run `./deploy.sh fix` to see DNS record, then add to your DNS
+3. **SSL errors**: Run `./deploy.sh fix` to expand certificate chain
+4. **Email not delivering**: Check Postfix logs with `./deploy.sh logs postfix`
+5. **Any service failing**: Try `./deploy.sh rebuild` for nuclear option
 
 ## Monitoring
 
 ### Health Checks
+
+Quick status check:
+
+```bash
+./deploy.sh status
+```
+
+Manual checks:
+
 ```bash
 # Check all services
 docker compose ps

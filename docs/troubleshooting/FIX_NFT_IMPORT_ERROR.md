@@ -25,13 +25,19 @@ However:
 
 The Docker container needs to be rebuilt to pick up the latest source code without the problematic import.
 
-### Quick Fix
+### Quick Fix (Recommended)
 
-Run the provided rebuild script:
+Run the deployment script's fix command:
 
 ```bash
-./rebuild-webmail.sh
+./deploy.sh fix
 ```
+
+This automatically:
+- Rebuilds the webmail container with latest code
+- Checks for other common issues
+- Verifies the container starts successfully
+- Shows clear error messages if something fails
 
 ### Manual Fix
 
