@@ -31,6 +31,7 @@ sys.path.append('/app')
 from nft_verification_service import nft_service
 from reputation_service import reputation_service
 from wallet_service import wallet_service
+from folder_service import folder_service
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -408,11 +409,21 @@ def register():
                 print(f"⚠ Warning: Wallet generation error for {email_addr}: {wallet_error}")
                 # Don't fail registration if wallet generation fails
 
+            # Create default email folders/categories
+            try:
+                if folder_service.create_default_folders(email_addr):
+                    print(f"✓ Default folders created for {email_addr}")
+                else:
+                    print(f"⚠ Warning: Folder creation failed for {email_addr}")
+            except Exception as folder_error:
+                print(f"⚠ Warning: Folder creation error for {email_addr}: {folder_error}")
+                # Don't fail registration if folder creation fails
+
             # Store recovery key in session to show to user
             session['show_recovery_key'] = recovery_key
             session['recovery_email'] = email_addr
 
-            flash('Account created successfully! Multi-chain wallet generated.', 'success')
+            flash('Account created successfully! Multi-chain wallet & folders ready.', 'success')
             return redirect(url_for('show_recovery_key'))
 
         except Exception as e:
@@ -1334,6 +1345,122 @@ def export_wallet_route():
 
     except Exception as e:
         print(f"Error exporting wallet: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/folders')
+def folders():
+    """Get user's folders (for inbox sidebar)"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        folders_list = folder_service.get_folders(session['email'])
+        return jsonify({'success': True, 'folders': folders_list})
+    except Exception as e:
+        print(f"Error getting folders: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/folders/create', methods=['POST'])
+def create_folder():
+    """Create a custom folder/label"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    folder_name = request.form.get('folder_name', '').strip()
+    color = request.form.get('color', '#667eea')
+    icon = request.form.get('icon', '📁')
+
+    if not folder_name:
+        return jsonify({'success': False, 'error': 'Folder name required'}), 400
+
+    try:
+        success, message = folder_service.create_custom_folder(
+            session['email'],
+            folder_name,
+            color,
+            icon
+        )
+
+        if success:
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'success': False, 'error': message}), 400
+
+    except Exception as e:
+        print(f"Error creating folder: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/folders/delete/<int:folder_id>', methods=['POST'])
+def delete_folder(folder_id):
+    """Delete a custom folder"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    try:
+        success, message = folder_service.delete_custom_folder(session['email'], folder_id)
+
+        if success:
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'success': False, 'error': message}), 400
+
+    except Exception as e:
+        print(f"Error deleting folder: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/email/<message_id>/label', methods=['POST'])
+def label_email(message_id):
+    """Add a label to an email"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    label_name = request.form.get('label_name', '').strip()
+
+    if not label_name:
+        return jsonify({'success': False, 'error': 'Label name required'}), 400
+
+    try:
+        success = folder_service.add_label_to_email(
+            session['email'],
+            message_id,
+            label_name,
+            ai_generated=False
+        )
+
+        if success:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to add label'}), 500
+
+    except Exception as e:
+        print(f"Error labeling email: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/email/<message_id>/unlabel', methods=['POST'])
+def unlabel_email(message_id):
+    """Remove a label from an email"""
+    if 'email' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    label_name = request.form.get('label_name', '').strip()
+
+    if not label_name:
+        return jsonify({'success': False, 'error': 'Label name required'}), 400
+
+    try:
+        success = folder_service.remove_label_from_email(
+            session['email'],
+            message_id,
+            label_name
+        )
+
+        if success:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to remove label'}), 500
+
+    except Exception as e:
+        print(f"Error unlabeling email: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
