@@ -4,57 +4,244 @@
 
 {% block content %}
 <style>
+    .compose-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    .compose-card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        box-shadow: var(--card-shadow);
+        border: 1px solid var(--border);
+        padding: 2rem;
+    }
+
+    .compose-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 2px solid var(--border);
+    }
+
+    .compose-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .compose-title-icon {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .compose-form .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .compose-form label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.6rem;
+        color: var(--text-dark);
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .compose-form input[type="email"],
+    .compose-form input[type="text"] {
+        width: 100%;
+        padding: 0.9rem 1rem;
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: var(--bg-main);
+        color: var(--text-dark);
+    }
+
+    .compose-form input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
+    }
+
+    .compose-form textarea {
+        width: 100%;
+        min-height: 350px;
+        padding: 1rem;
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        font-size: 1rem;
+        line-height: 1.6;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        transition: all 0.3s ease;
+        background: var(--bg-main);
+        color: var(--text-dark);
+        resize: vertical;
+    }
+
+    .compose-form textarea:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
+    }
+
+    .encryption-status {
+        padding: 1rem 1.25rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        display: none;
+        font-size: 0.95rem;
+        font-weight: 500;
+        animation: slideDown 0.3s ease;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .compose-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--border);
+    }
+
+    .compose-btn-send {
+        flex: 1;
+        padding: 1rem 2rem;
+        font-size: 1rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .compose-btn-send:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(118, 75, 162, 0.3);
+    }
+
+    .compose-btn-cancel {
+        padding: 1rem 2rem;
+        font-size: 1rem;
+        font-weight: 600;
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-dark);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .compose-btn-cancel:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+        background: rgba(118, 75, 162, 0.05);
+    }
+
     @media (max-width: 768px) {
-        .card h2 {
-            font-size: 1.3rem;
+        .compose-container {
+            padding: 1rem 0.5rem;
         }
 
-        .form-group textarea {
+        .compose-card {
+            padding: 1.5rem;
+        }
+
+        .compose-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .compose-actions {
+            flex-direction: column;
+        }
+
+        .compose-form textarea {
             min-height: 250px;
-        }
-
-        .card form > div[style*="display: flex"] {
-            flex-direction: column !important;
-        }
-
-        .card form > div[style*="display: flex"] .btn {
-            width: 100%;
         }
     }
 </style>
 
-<div class="card">
-    <h2 style="margin-bottom: 1.5rem;">Compose New Email</h2>
+<div class="compose-container">
+    <div class="compose-card">
+        <div class="compose-header">
+            <div class="compose-title">
+                <div class="compose-title-icon">✍️</div>
+                <span>Compose New Email</span>
+            </div>
+        </div>
 
-    <!-- Encryption Status Badge -->
-    <div id="encryptionStatus" style="padding: 10px; border-radius: 4px; margin-bottom: 1rem; display: none;">
-        <span id="encryptionIcon"></span>
-        <span id="encryptionText"></span>
+        <!-- Encryption Status Badge -->
+        <div id="encryptionStatus" class="encryption-status">
+            <span id="encryptionIcon"></span>
+            <span id="encryptionText"></span>
+        </div>
+
+        <form method="POST" id="composeForm" class="compose-form">
+            <div class="form-group">
+                <label for="to">To</label>
+                <input type="email" id="to" name="to" required placeholder="recipient@example.com">
+            </div>
+
+            <div class="form-group">
+                <label for="subject">Subject</label>
+                <input type="text" id="subject" name="subject" required placeholder="What's this email about?">
+            </div>
+
+            <div class="form-group">
+                <label for="body">Message</label>
+                <textarea id="body" name="body" placeholder="Write your message here..."></textarea>
+            </div>
+
+            <!-- Hidden fields for encryption -->
+            <input type="hidden" id="encrypted" name="encrypted" value="false">
+            <input type="hidden" id="encrypted_body" name="encrypted_body" value="">
+
+            <div class="compose-actions">
+                <button type="submit" class="compose-btn-send">
+                    <span>📤</span>
+                    <span>Send Email</span>
+                </button>
+                <a href="{{ url_for('inbox') }}" class="compose-btn-cancel">Cancel</a>
+            </div>
+        </form>
     </div>
-
-    <form method="POST" id="composeForm">
-        <div class="form-group">
-            <label for="to">To</label>
-            <input type="email" id="to" name="to" required placeholder="recipient@example.com">
-        </div>
-        <div class="form-group">
-            <label for="subject">Subject</label>
-            <input type="text" id="subject" name="subject" required placeholder="Email subject">
-        </div>
-        <div class="form-group">
-            <label for="body">Message</label>
-            <textarea id="body" name="body" placeholder="Write your message here..."></textarea>
-        </div>
-
-        <!-- Hidden fields for encryption -->
-        <input type="hidden" id="encrypted" name="encrypted" value="false">
-        <input type="hidden" id="encrypted_body" name="encrypted_body" value="">
-
-        <div style="display: flex; gap: 1rem;">
-            <button type="submit" class="btn btn-primary">Send Email</button>
-            <a href="{{ url_for('inbox') }}" class="btn btn-secondary">Cancel</a>
-        </div>
-    </form>
 </div>
 
 <script src="{{ url_for('static', filename='crypto.js') }}"></script>
