@@ -33,6 +33,7 @@ from reputation_service import reputation_service
 from wallet_service import wallet_service
 from folder_service import folder_service
 from ai_labeling import ai_labeling_service
+from session_manager import session_manager
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -372,10 +373,16 @@ def login():
                 print(f"Error loading encryption keys: {e}")
                 session['has_encryption'] = False
 
+            # Create session with device tracking (like Gmail)
+            user_agent = request.headers.get('User-Agent', '')
+            ip_address = request.remote_addr
+            session_token = session_manager.create_session(email_addr, user_agent, ip_address)
+
             session.permanent = True
             session['email'] = email_addr
             session['password'] = password
             session['auth_type'] = 'password'
+            session['session_token'] = session_token  # Store for session management
             flash('Login successful!', 'success')
             return redirect(url_for('inbox'))
         else:
@@ -471,12 +478,17 @@ def register():
             conn.close()
 
             # Generate multi-chain wallets for the user
+            wallet_addresses = {}
             try:
                 wallet_result = wallet_service.generate_wallets(email_addr, password)
                 if wallet_result['success']:
                     print(f"✓ Wallets generated for {email_addr}")
                     print(f"  Solana: {wallet_result['wallets']['solana']['address']}")
                     print(f"  EVM: {wallet_result['wallets']['ethereum']['address']}")
+                    wallet_addresses = {
+                        'solana': wallet_result['wallets']['solana']['address'],
+                        'evm': wallet_result['wallets']['ethereum']['address']
+                    }
                 else:
                     print(f"⚠ Warning: Wallet generation failed for {email_addr}: {wallet_result.get('error')}")
             except Exception as wallet_error:
@@ -493,11 +505,50 @@ def register():
                 print(f"⚠ Warning: Folder creation error for {email_addr}: {folder_error}")
                 # Don't fail registration if folder creation fails
 
-            # Store recovery key in session to show to user
+            # ========== PORTID ZERO-KNOWLEDGE KEYRING ==========
+            # This is the critical security feature:
+            # We create an encrypted keyring containing ALL user keys.
+            # The keyring is encrypted client-side with user's password.
+            # Server stores encrypted blob - can NEVER decrypt it.
+            # User needs recovery_key to access from new device.
+
+            portid_recovery_key = None
+            if portid_service.is_enabled():
+                try:
+                    # Create PortID encrypted storage
+                    portid_result = portid_service.sign_up(email_addr, password)
+
+                    if portid_result:
+                        portid_recovery_key = portid_result['recovery_key']
+
+                        # Create keyring with all sensitive keys
+                        keyring = {
+                            'email_private_key': private_key_pem,
+                            'email_public_key': public_key_pem,
+                            'wallets': wallet_addresses,
+                            'preferences': {
+                                'theme': 'light',
+                                'language': 'en'
+                            }
+                        }
+
+                        # Backup encrypted keyring to server
+                        if portid_service.backup(keyring):
+                            print(f"✓ Keyring backed up via PortID for {email_addr}")
+                        else:
+                            print(f"⚠ Warning: PortID backup failed for {email_addr}")
+
+                except Exception as portid_error:
+                    print(f"⚠ Warning: PortID setup error for {email_addr}: {portid_error}")
+
+            # Store BOTH recovery keys in session to show to user
+            # The original recovery_key encrypts the email private key in DB (fallback)
+            # The portid_recovery_key allows restoring full keyring on new device (primary)
             session['show_recovery_key'] = recovery_key
+            session['portid_recovery_key'] = portid_recovery_key
             session['recovery_email'] = email_addr
 
-            flash('Account created successfully! Multi-chain wallet & folders ready.', 'success')
+            flash('Account created successfully! Multi-chain wallet & encrypted keyring ready.', 'success')
             return redirect(url_for('show_recovery_key'))
 
         except Exception as e:

@@ -539,6 +539,30 @@ def init_database():
         )
     """)
 
+    # Create user sessions table (device tracking like Gmail)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            session_token VARCHAR(255) UNIQUE NOT NULL,
+            device_name VARCHAR(255),
+            device_type VARCHAR(100),
+            browser VARCHAR(100),
+            os VARCHAR(100),
+            ip_address VARCHAR(45),
+            location VARCHAR(255),
+            last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            is_active BOOLEAN DEFAULT TRUE,
+            revoked_at TIMESTAMP
+        )
+    """)
+
+    # Create index on session_token for fast lookups
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_session_token ON user_sessions(session_token)
+    """)
+
     # Create default admin user (admin/admin) - CHANGE THIS!
     import bcrypt
     default_password = bcrypt.hashpw(b'admin', bcrypt.gensalt()).decode('utf-8')
