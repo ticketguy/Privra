@@ -224,12 +224,59 @@ Last Updated: 2025-11-18
 
 ---
 
+## 🟠 PRIORITY 4: Automation & Agents (4 weeks)
+
+**Status:** Not Started
+**After:** B2B completion (Week 15+)
+
+### Feature 4.1: Privra Pipeline (Week 15-16)
+- [ ] `pipeline_columns` table
+- [ ] `pipeline_automation_rules` table
+- [ ] `pipeline_status` column in emails
+- [ ] `pipeline_service.py` implementation
+- [ ] Kanban board UI (`templates/pipeline.html`)
+- [ ] Drag-and-drop functionality
+- [ ] Move email between columns
+- [ ] Automation rules engine
+- [ ] Custom columns configuration
+
+**Estimated Time:** 2 weeks
+
+### Feature 4.2: SDR Agent (Week 16-17)
+- [ ] `sdr_agent_leads` table
+- [ ] `sdr_agent_research_sources` table
+- [ ] `sdr_agent.py` service
+- [ ] Company website scraper
+- [ ] LinkedIn search integration
+- [ ] News aggregation (DuckDuckGo API)
+- [ ] Email draft generation (AI)
+- [ ] SDR Agent UI (`templates/sdr_agent.html`)
+- [ ] Lead tracking dashboard
+
+**Estimated Time:** 1 week
+
+### Feature 4.3: Invoice Droid (Week 17-18)
+- [ ] `invoice_agent_invoices` table
+- [ ] `invoice_agent.py` service
+- [ ] PDF text extraction (PyPDF2)
+- [ ] LLM-based data extraction
+- [ ] Invoice data validation
+- [ ] CSV export functionality
+- [ ] Auto-process email attachments
+- [ ] Invoice dashboard
+
+**Estimated Time:** 1 week
+
+**Total Priority 4 Time:** 4 weeks
+
+---
+
 ## 🟢 PRIORITY 2: AI Workspace (8 weeks)
 
 **Status:** Not Started
-**After:** Privacy Shield + B2B completion (Week 23+)
+**After:** Privacy Shield + B2B + Automation (Week 19+)
 
-### Feature 2.1: AI Infrastructure (Week 15-16)
+### Feature 2.1: AI Infrastructure (Week 19-20)
 - [ ] Provision GPU droplet (DigitalOcean A10G)
 - [ ] Install CUDA drivers
 - [ ] Install vLLM container
@@ -240,7 +287,7 @@ Last Updated: 2025-11-18
 
 **Estimated Time:** 2 weeks
 
-### Feature 2.2: LoRA Adapter System (Week 17-19)
+### Feature 2.2: LoRA Adapter System (Week 21-23)
 - [ ] `user_adapters` table
 - [ ] `adapter_training_queue` table
 - [ ] `adapter_usage_logs` table
@@ -256,7 +303,7 @@ Last Updated: 2025-11-18
 
 **Estimated Time:** 3 weeks
 
-### Feature 2.3: Local RAG (Week 20)
+### Feature 2.3: Local RAG (Week 24)
 - [ ] `email_embeddings` table (pgvector)
 - [ ] Email indexing worker
 - [ ] `rag_service.py`
@@ -269,7 +316,7 @@ Last Updated: 2025-11-18
 
 **Estimated Time:** 1 week
 
-### Feature 2.4: Living Docs (Week 21)
+### Feature 2.4: Living Docs (Week 25)
 - [ ] `living_docs` table
 - [ ] `living_doc_versions` table
 - [ ] `living_docs_service.py`
@@ -282,7 +329,7 @@ Last Updated: 2025-11-18
 
 **Estimated Time:** 1 week
 
-### Feature 2.5: Neural Sync (Week 22)
+### Feature 2.5: Neural Sync (Week 26)
 - [ ] `ai_memory_blobs` table
 - [ ] `neural_sync_service.py`
 - [ ] Memory blob generation (preferences, style, patterns)
@@ -305,9 +352,10 @@ Last Updated: 2025-11-18
 | Foundation | ✅ Complete | - | - | Week 0 | Infrastructure |
 | Priority 1 (Privacy Shield) | 🔜 Next | 6 weeks | Week 1 | Week 6 | **v1.0 MVP** |
 | Priority 3 (B2B/Org) | ⏳ Queued | 8 weeks | Week 7 | Week 14 | **v2.0 Enterprise** |
-| Priority 2 (AI Workspace) | ⏳ Queued | 8 weeks | Week 15 | Week 22 | **v3.0 Full Vision** |
+| Priority 4 (Automation) | ⏳ Queued | 4 weeks | Week 15 | Week 18 | **v2.5 Autopilot** |
+| Priority 2 (AI Workspace) | ⏳ Queued | 8 weeks | Week 19 | Week 26 | **v3.0 Full Vision** |
 
-**Total Time to Full Vision:** 22 weeks (~5.5 months)
+**Total Time to Full Vision:** 26 weeks (~6.5 months)
 
 ---
 

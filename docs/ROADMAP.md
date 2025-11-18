@@ -88,28 +88,54 @@ Privra is the sovereign AI workspace that combines:
 
 ---
 
-## 🟢 PRIORITY 2: AI Workspace (Weeks 15-22)
+## 🟠 PRIORITY 4: Automation & Agents (Weeks 15-18)
+**Goal:** Make Privra agentic - AI that takes action, not just answers.
+
+### Phase 4A: Privra Pipeline (Week 15-16)
+- Kanban email view (To-Do, In Progress, Done)
+- Drag-and-drop workflow
+- Automation rules (if subject contains X → move to Y)
+- Custom columns per user
+
+### Phase 4B: SDR Agent (Week 16-17)
+- Auto-research leads (company info, LinkedIn)
+- Draft personalized cold emails
+- Lead tracking and analytics
+- Integration with sales workflows
+
+### Phase 4C: Invoice Droid (Week 17-18)
+- Extract data from PDF invoices
+- Auto-export to CSV
+- OCR + LLM extraction
+- QuickBooks/accounting integration
+
+**Deliverable:** Privra v2.5 - "The Autopilot Email"
+**Revenue:** Upsell feature for B2B ($5-10/seat add-on)
+
+---
+
+## 🟢 PRIORITY 2: AI Workspace (Weeks 19-26)
 **Goal:** Make Privra the smartest email client. LAST after other features.
 
-### Phase 2A: AI Infrastructure (Week 15-16)
+### Phase 2A: AI Infrastructure (Week 19-20)
 - GPU droplet setup (NVIDIA A10G)
 - vLLM + Llama 3.1 8B installation
 - ChromaDB/pgvector for embeddings
 - Docker GPU configuration
 
-### Phase 2B: LoRA Adapter System (Week 17-19)
+### Phase 2B: LoRA Adapter System (Week 21-23)
 - Multi-tenancy with user adapters
 - `vllm_client.py`, `adapter_manager.py`
 - Background training worker
 - Adapter creation on registration
 
-### Phase 2C: Local RAG (Week 20)
+### Phase 2C: Local RAG (Week 24)
 - "Chat with your email" sidebar
 - Email embeddings generation
 - RAG query service
 - Citation links
 
-### Phase 2D: Living Docs & Neural Sync (Week 21-22)
+### Phase 2D: Living Docs & Neural Sync (Week 25-26)
 - Email threads → Markdown conversion
 - Auto-updating documents
 - Neural Sync (encrypted memory blobs to PortID)
@@ -127,9 +153,10 @@ Privra is the sovereign AI workspace that combines:
 | ✅ Foundation | PortID, Wallets, Email | DONE | DONE | Infrastructure |
 | 🔴 Priority 1 | Privacy Shield | 6 weeks | Week 6 | **v1.0 MVP** |
 | 🟡 Priority 3 | B2B/Orgs | 8 weeks | Week 14 | **v2.0 Enterprise** |
-| 🟢 Priority 2 | AI Workspace | 8 weeks | Week 22 | **v3.0 Full Vision** |
+| 🟠 Priority 4 | Automation & Agents | 4 weeks | Week 18 | **v2.5 Autopilot** |
+| 🟢 Priority 2 | AI Workspace | 8 weeks | Week 26 | **v3.0 Full Vision** |
 
-**Total Time to Full Vision:** 22 weeks (~5.5 months)
+**Total Time to Full Vision:** 26 weeks (~6.5 months)
 
 ---
 
