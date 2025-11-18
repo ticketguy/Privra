@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}Active Sessions - Privra Webmail{% endblock %}
+
+{% block content %}
+<style>
+    .sessions-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    .sessions-header {
+        margin-bottom: 2rem;
+    }
+
+    .sessions-title {
+        font-size: 2rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 0.5rem;
+    }
+
+    .sessions-subtitle {
+        color: var(--text-light);
+        font-size: 1rem;
+    }
+
+    .session-card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        box-shadow: var(--card-shadow);
+        border: 1px solid var(--border);
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .session-card:hover {
+        box-shadow: 0 4px 16px rgba(118, 75, 162, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .session-card.current {
+        border: 2px solid var(--primary);
+        background: linear-gradient(135deg, rgba(118, 75, 162, 0.05), rgba(102, 126, 234, 0.05));
+    }
+
+    .session-icon {
+        width: 60px;
+        height: 60px;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem;
+        flex-shrink: 0;
+    }
+
+    .session-info {
+        flex: 1;
+    }
+
+    .session-device {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        margin-bottom: 0.25rem;
+    }
+
+    .session-details {
+        font-size: 0.9rem;
+        color: var(--text-light);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-top: 0.5rem;
+    }
+
+    .session-detail-item {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .session-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .badge-current {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+    }
+
+    .badge-active {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+
+    .session-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .btn-revoke {
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        border: 2px solid #ef5350;
+        border-radius: 8px;
+        background: transparent;
+        color: #ef5350;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .btn-revoke:hover {
+        background: #ef5350;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .btn-revoke-all {
+        padding: 0.8rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        border: 2px solid #ef5350;
+        border-radius: 8px;
+        background: transparent;
+        color: #ef5350;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 2rem;
+    }
+
+    .btn-revoke-all:hover {
+        background: #ef5350;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .no-sessions {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: var(--text-light);
+    }
+
+    @media (max-width: 768px) {
+        .session-card {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .session-actions {
+            width: 100%;
+        }
+
+        .btn-revoke {
+            flex: 1;
+        }
+
+        .session-details {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+    }
+</style>
+
+<div class="sessions-container">
+    <div class="sessions-header">
+        <h1 class="sessions-title">Your Active Sessions</h1>
+        <p class="sessions-subtitle">
+            Manage devices and locations where you're currently signed in to your Privra account.
+        </p>
+    </div>
+
+    {% if sessions %}
+        {% for sess in sessions %}
+        <div class="session-card {% if sess.is_current %}current{% endif %}">
+            <div class="session-icon">
+                {% if 'Mobile' in sess.device_type %}
+                📱
+                {% elif 'Tablet' in sess.device_type %}
+                📱
+                {% else %}
+                💻
+                {% endif %}
+            </div>
+
+            <div class="session-info">
+                <div class="session-device">
+                    {{ sess.device_name }}
+                    {% if sess.is_current %}
+                    <span class="session-badge badge-current">This Device</span>
+                    {% else %}
+                    <span class="session-badge badge-active">Active</span>
+                    {% endif %}
+                </div>
+
+                <div class="session-details">
+                    <div class="session-detail-item">
+                        <span>📍</span>
+                        <span>{{ sess.location }}</span>
+                    </div>
+                    <div class="session-detail-item">
+                        <span>🌐</span>
+                        <span>{{ sess.ip_address }}</span>
+                    </div>
+                    <div class="session-detail-item">
+                        <span>🕐</span>
+                        <span>Last active: {{ sess.last_activity.strftime('%b %d, %Y at %I:%M %p') }}</span>
+                    </div>
+                </div>
+            </div>
+
+            {% if not sess.is_current %}
+            <div class="session-actions">
+                <form method="POST" action="{{ url_for('revoke_session') }}" style="margin: 0;">
+                    <input type="hidden" name="session_token" value="{{ sess.session_token }}">
+                    <button type="submit" class="btn-revoke" onclick="return confirm('Revoke this session?')">
+                        Sign Out
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        {% if sessions|length > 1 %}
+        <form method="POST" action="{{ url_for('revoke_all_sessions') }}">
+            <button type="submit" class="btn-revoke-all" onclick="return confirm('Sign out from all other devices? You will remain signed in on this device.')">
+                🚪 Sign Out All Other Sessions
+            </button>
+        </form>
+        {% endif %}
+    {% else %}
+    <div class="no-sessions">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">🔒</div>
+        <h3>No Active Sessions</h3>
+        <p>You are not signed in on any device.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

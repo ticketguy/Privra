@@ -732,9 +732,65 @@ def portid_restore():
 @app.route('/logout')
 def logout():
     """Logout"""
+    # Revoke current session
+    if 'session_token' in session:
+        session_manager.revoke_session(session['session_token'], session.get('email'))
+
     session.clear()
     flash('Logged out successfully', 'success')
     return redirect(url_for('login'))
+
+
+@app.route('/sessions')
+def sessions():
+    """View active sessions (like Gmail's device activity)"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    user_email = session['email']
+    current_token = session.get('session_token')
+
+    # Get all active sessions for user
+    all_sessions = session_manager.get_user_sessions(user_email)
+
+    # Mark current session
+    for sess in all_sessions:
+        sess['is_current'] = (sess['session_token'] == current_token)
+
+    return render_template('sessions.html', sessions=all_sessions)
+
+
+@app.route('/sessions/revoke', methods=['POST'])
+def revoke_session():
+    """Revoke a specific session"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    session_token = request.form.get('session_token')
+    user_email = session['email']
+
+    if session_manager.revoke_session(session_token, user_email):
+        flash('Session revoked successfully', 'success')
+    else:
+        flash('Failed to revoke session', 'error')
+
+    return redirect(url_for('sessions'))
+
+
+@app.route('/sessions/revoke-all', methods=['POST'])
+def revoke_all_sessions():
+    """Revoke all sessions except current one"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    user_email = session['email']
+    current_token = session.get('session_token')
+
+    session_manager.revoke_all_sessions(user_email, except_token=current_token)
+    flash('All other sessions have been signed out', 'success')
+
+    return redirect(url_for('sessions'))
+
 
 @app.route('/inbox')
 def inbox():
@@ -2115,6 +2171,18 @@ def save_admin_rpc_settings():
     except Exception as e:
         print(f"Error saving admin RPC settings: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/sitemap.xml')
+def sitemap():
+    """Generate SEO sitemap for Google"""
+    base_url = request.url_root.rstrip('/')
+    lastmod = datetime.now().strftime('%Y-%m-%d')
+
+    return render_template('sitemap.xml',
+                         base_url=base_url,
+                         lastmod=lastmod), 200, {'Content-Type': 'application/xml'}
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
