@@ -28,7 +28,7 @@ from email_categorizer import EmailCategorizer
 from werkzeug.middleware.proxy_fix import ProxyFix
 import sys
 sys.path.append('/app')
-from nft_verification_service import nft_service
+from nft_verification_service import nft_verification_service as nft_service
 from reputation_service import reputation_service
 from wallet_service import wallet_service
 from folder_service import folder_service
@@ -491,6 +491,12 @@ def register():
                 VALUES (%s, FALSE, FALSE)
             """, (email_addr,))
 
+            # Create default user profile
+            cur.execute("""
+                INSERT INTO user_profiles (user_email, display_name, profile_type)
+                VALUES (%s, %s, 'individual')
+            """, (email_addr, email_addr.split('@')[0]))
+
             conn.commit()
             cur.close()
             conn.close()
@@ -867,6 +873,15 @@ def consent_settings():
         # Update consent settings
         require_consent = request.form.get('require_consent') == 'on'
         whitelist_mode = request.form.get('whitelist_mode') == 'on'
+        require_payment = request.form.get('require_payment') == 'on'
+        payment_amount = request.form.get('payment_amount', '0').strip()
+        payment_address = request.form.get('payment_address', '').strip()
+
+        # Convert payment_amount to float
+        try:
+            payment_amount_float = float(payment_amount) if payment_amount else 0.0
+        except ValueError:
+            payment_amount_float = 0.0
 
         try:
             conn = get_db()
@@ -874,14 +889,17 @@ def consent_settings():
 
             # Upsert consent settings
             cur.execute("""
-                INSERT INTO consent_settings (user_email, require_consent, whitelist_mode)
-                VALUES (%s, %s, %s)
+                INSERT INTO consent_settings (user_email, require_consent, whitelist_mode, require_payment, payment_amount, payment_address)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (user_email)
                 DO UPDATE SET
                     require_consent = EXCLUDED.require_consent,
                     whitelist_mode = EXCLUDED.whitelist_mode,
+                    require_payment = EXCLUDED.require_payment,
+                    payment_amount = EXCLUDED.payment_amount,
+                    payment_address = EXCLUDED.payment_address,
                     updated_at = CURRENT_TIMESTAMP
-            """, (user_email, require_consent, whitelist_mode))
+            """, (user_email, require_consent, whitelist_mode, require_payment, payment_amount_float, payment_address))
 
             conn.commit()
             cur.close()
@@ -901,7 +919,7 @@ def consent_settings():
 
         # Get consent settings
         cur.execute("""
-            SELECT require_consent, whitelist_mode
+            SELECT require_consent, whitelist_mode, require_payment, payment_amount, payment_address
             FROM consent_settings
             WHERE user_email = %s
         """, (user_email,))
@@ -931,6 +949,9 @@ def consent_settings():
         return render_template('consent_settings.html',
                              require_consent=settings[0] if settings else False,
                              whitelist_mode=settings[1] if settings else False,
+                             require_payment=settings[2] if settings else False,
+                             payment_amount=settings[3] if settings else 0.0,
+                             payment_address=settings[4] if settings else '',
                              whitelist=whitelist,
                              blacklist=blacklist)
 

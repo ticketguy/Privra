@@ -1,570 +1,428 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Privra Webmail{% endblock %}</title>
-
-    <!-- PWA Meta Tags -->
-    <meta name="description" content="Privacy-first encrypted email with Web3 integration">
+    <title>{% block title %}Privra Mail{% endblock %}</title>
     <meta name="theme-color" content="#764ba2">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Privra Mail">
-
-    <!-- PWA Manifest -->
     <link rel="manifest" href="/static/manifest.json">
-
-    <!-- Theme System -->
-    <link rel="stylesheet" href="/static/themes.css">
-
-    <!-- Icons -->
-    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192x192.png">
-    <link rel="apple-touch-icon" sizes="192x192" href="/static/icons/icon-192x192.png">
-    <link rel="shortcut icon" href="/static/icons/icon-72x72.png">
-
     <style>
+        :root {
+            --primary: #FF8200;
+            --primary-dark: #E67300;
+            --secondary: #004185;
+            --bg-main: #F9FBFF;
+            --sidebar-bg: #FFFFFF;
+            --text-dark: #101828;
+            --text-light: #979797;
+            --border: #E0E0E0;
+            --glass-bg: rgba(255, 255, 255, 0.2);
+            --glass-border: rgba(255, 255, 255, 0.3);
+        }
+
+        [data-theme="dark"] {
+            --bg-main: #1a1a2e;
+            --sidebar-bg: #16213e;
+            --text-dark: #eaeaea;
+            --text-light: #a0a0a0;
+            --border: #2d3748;
+            --glass-bg: rgba(30, 30, 50, 0.3);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
-        /* Animated gradient background */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-dark);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated gradient background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 300px;
             background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #4facfe);
             background-size: 400% 400%;
             animation: gradientShift 15s ease infinite;
-            line-height: 1.6;
-            min-height: 100vh;
-            position: relative;
+            z-index: -1;
+            opacity: 0.3;
         }
 
-        /* Liquid gradient animation */
         @keyframes gradientShift {
-            0% {
-                background-position: 0% 50%;
-            }
-            50% {
-                background-position: 100% 50%;
-            }
-            100% {
-                background-position: 0% 50%;
-            }
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
         }
 
-        /* Glassmorphic header */
-        .header {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            color: white;
-            padding: 1rem 2rem;
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 205px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border);
+            padding: 25px 0 15px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 20;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-logo {
+            text-align: center;
+            margin-bottom: 77px;
+            padding: 0 20px;
+        }
+
+        .sidebar-logo h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: bold;
+        }
+
+        .sidebar nav {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar nav a {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            color: var(--text-light);
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar nav a:hover,
+        .sidebar nav a.active {
+            color: var(--primary);
+            background: rgba(255, 130, 0, 0.1);
+            border-left-color: var(--primary);
+        }
+
+        .sidebar nav a svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: 205px;
+            background: var(--bg-main);
+        }
+
+        /* Top Header */
+        .top-header {
+            background: var(--sidebar-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 25px 52px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             position: sticky;
             top: 0;
-            z-index: 100;
-        }
-        .header h1 {
-            font-size: 1.5rem;
-        }
-        .header nav a {
-            color: white;
-            text-decoration: none;
-            margin-left: 1.5rem;
-            padding: 0.5rem 1rem;
-            border-radius: 12px;
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.1);
-        }
-        .header nav a:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-        .container {
-            max-width: 1200px;
-            margin: 2rem auto;
-            padding: 0 1rem;
-        }
-        .flash-messages {
-            margin-bottom: 1rem;
-        }
-        .flash {
-            padding: 1rem;
-            border-radius: 12px;
-            margin-bottom: 0.5rem;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            animation: slideIn 0.4s ease-out;
+            z-index: 10;
         }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .header-greeting h1 {
+            font-size: 24px;
+            color: var(--text-dark);
+        }
+
+        .header-greeting span.name {
+            color: var(--text-dark);
+        }
+
+        .header-greeting span.wave {
+            color: var(--text-light);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .theme-toggle {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            background: rgba(255, 130, 0, 0.2);
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        .user-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .user-info h6 {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+
+        .user-info p {
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        /* Content Area */
+        .content {
+            padding: 40px 52px;
+        }
+
+        /* Glass Cards */
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            margin-bottom: 24px;
+            transition: all 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 24px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #E0E0E0;
+            color: var(--text-dark);
+        }
+
+        /* Flash Messages */
+        .flash {
+            padding: 12px 24px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            backdrop-filter: blur(10px);
         }
 
         .flash.success {
-            background: rgba(212, 237, 218, 0.9);
-            color: #155724;
-            border-color: rgba(195, 230, 203, 0.8);
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4CAF50;
+            color: #2E7D32;
         }
+
         .flash.error {
-            background: rgba(248, 215, 218, 0.9);
-            color: #721c24;
-            border-color: rgba(245, 198, 203, 0.8);
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #F44336;
+            color: #C62828;
         }
 
-        /* Glassmorphic card */
-        .card {
-            background: rgba(255, 255, 255, 0.25);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-radius: 16px;
-            padding: 2rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            animation: fadeInUp 0.5s ease-out;
-        }
-
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            color: white;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-        .form-group input,
-        .form-group textarea {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border-radius: 12px;
-            font-size: 1rem;
-            color: white;
-            transition: all 0.3s ease;
-        }
-        .form-group input::placeholder,
-        .form-group textarea::placeholder {
-            color: rgba(255, 255, 255, 0.6);
-        }
-        .form-group input:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: rgba(255, 255, 255, 0.5);
-            background: rgba(255, 255, 255, 0.25);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-        }
-        .form-group textarea {
-            min-height: 200px;
-            resize: vertical;
-        }
-
-        /* Glassmorphic buttons */
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            position: relative;
-            overflow: hidden;
-        }
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-            transition: left 0.5s;
-        }
-        .btn:hover::before {
-            left: 100%;
-        }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-        }
-        .btn-primary {
-            background: rgba(52, 152, 219, 0.8);
-            color: white;
-        }
-        .btn-primary:hover {
-            background: rgba(52, 152, 219, 0.9);
-        }
-        .btn-success {
-            background: rgba(39, 174, 96, 0.8);
-            color: white;
-        }
-        .btn-success:hover {
-            background: rgba(39, 174, 96, 0.9);
-        }
-        .btn-secondary {
-            background: rgba(149, 165, 166, 0.8);
-            color: white;
-        }
-        .btn-secondary:hover {
-            background: rgba(149, 165, 166, 0.9);
-        }
-        .btn-danger {
-            background: rgba(231, 76, 60, 0.8);
-            color: white;
-        }
-        .btn-danger:hover {
-            background: rgba(231, 76, 60, 0.9);
-        }
-        .email-list {
-            list-style: none;
-        }
-        .email-item {
-            padding: 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            display: flex;
-            justify-content: space-between;
-            transition: all 0.3s ease;
-            border-radius: 12px;
-            margin-bottom: 0.5rem;
-        }
-        .email-item:hover {
-            background: rgba(255, 255, 255, 0.15);
-            transform: translateX(5px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-        }
-        .email-item a {
-            color: white;
-            text-decoration: none;
-            flex: 1;
-        }
-        .email-subject {
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-            color: white;
-        }
-        .email-from {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 0.9rem;
-        }
-        .email-date {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.85rem;
-            white-space: nowrap;
-            margin-left: 1rem;
-        }
-        .email-body {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            padding: 1.5rem;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            margin-top: 1rem;
-            color: white;
-        }
-        .email-header {
-            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
-            padding-bottom: 1rem;
-            margin-bottom: 1rem;
-        }
-        .email-header h2 {
-            color: white;
-        }
-        .email-meta {
-            margin: 0.5rem 0;
-            color: rgba(255, 255, 255, 0.9);
-        }
-        .email-meta strong {
-            color: white;
-        }
-
-        /* Mobile Optimizations */
+        /* Mobile Responsive */
         @media (max-width: 768px) {
-            .header {
-                padding: 1rem;
-                flex-wrap: wrap;
+            .sidebar {
+                transform: translateX(-100%);
             }
 
-            .header h1 {
-                font-size: 1.2rem;
-                margin-bottom: 0;
+            .sidebar.open {
+                transform: translateX(0);
             }
 
-            .header nav {
-                position: fixed;
-                top: 0;
-                left: -100%;
-                width: 80%;
-                max-width: 300px;
-                height: 100vh;
-                background: rgba(255, 255, 255, 0.15);
-                backdrop-filter: blur(20px);
-                -webkit-backdrop-filter: blur(20px);
-                border-right: 1px solid rgba(255, 255, 255, 0.2);
-                z-index: 1000;
-                padding: 1rem;
-                transition: left 0.3s ease;
-                overflow-y: auto;
-                display: flex;
-                flex-direction: column;
+            .main-content {
+                margin-left: 0;
             }
 
-            .header nav.active {
-                left: 0;
-            }
-
-            .header nav a,
-            .header nav span,
-            .header nav button {
-                margin: 0.5rem 0;
-                margin-left: 0 !important;
-                display: block;
-                text-align: left;
-                width: 100%;
-            }
-
-            .mobile-menu-toggle {
-                display: block;
-                background: none;
-                border: none;
-                color: white;
-                font-size: 1.5rem;
-                cursor: pointer;
-                padding: 0.5rem;
-                margin-left: auto;
-            }
-
-            .mobile-menu-overlay {
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.5);
-                z-index: 999;
-            }
-
-            .mobile-menu-overlay.active {
-                display: block;
-            }
-
-            .container {
-                margin: 1rem auto;
-                padding: 0 0.75rem;
-            }
-
-            .card {
-                padding: 1rem;
-            }
-
-            .btn {
-                padding: 0.6rem 1.2rem;
-                font-size: 0.95rem;
-            }
-
-            /* Improve touch targets */
-            .header nav a,
-            .btn {
-                min-height: 44px;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            /* Responsive typography */
-            body {
-                font-size: 0.95rem;
-            }
-
-            .email-subject {
-                font-size: 0.95rem;
-            }
-
-            .email-from {
-                font-size: 0.85rem;
-            }
-
-            .email-date {
-                font-size: 0.8rem;
+            .top-header,
+            .content {
+                padding: 16px 24px;
             }
         }
 
-        .mobile-menu-toggle {
-            display: none;
-        }
-
-        /* Mobile navigation close button */
-        .mobile-nav-close {
-            display: none;
-            background: none;
-            border: none;
-            color: white;
-            font-size: 1.5rem;
-            cursor: pointer;
-            padding: 0.5rem;
-            align-self: flex-end;
-        }
-
-        @media (max-width: 768px) {
-            .mobile-nav-close {
-                display: block;
+        /* Liquid Glass Effect */
+        @keyframes liquidGlass {
+            0%, 100% {
+                border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
             }
+            50% {
+                border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+            }
+        }
+
+        .liquid-glass {
+            animation: liquidGlass 8s ease-in-out infinite;
         }
     </style>
 </head>
 <body>
-    <!-- Mobile menu overlay -->
-    <div class="mobile-menu-overlay" id="mobile-menu-overlay" onclick="toggleMobileMenu()"></div>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <h1>✉️ Privra</h1>
+            </div>
+            <nav>
+                <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <svg viewBox="0 0 22 22" fill="none"><path d="M1.5 9.93841C1.5 8.71422 2.06058 7.55744 3.02142 6.79888L8.52142 2.45677C9.97466 1.30948 12.0253 1.30948 13.4786 2.45677L18.9786 6.79888C19.9394 7.55744 20.5 8.71422 20.5 9.93841V16.5C20.5 18.7091 18.7091 20.5 16.5 20.5H15C14.4477 20.5 14 20.0523 14 19.5V16.5C14 15.3954 13.1046 14.5 12 14.5H10C8.89543 14.5 8 15.3954 8 16.5V19.5C8 20.0523 7.55228 20.5 7 20.5H5.5C3.29086 20.5 1.5 18.7091 1.5 16.5L1.5 9.93841Z" fill="currentColor" stroke="currentColor" stroke-width="1.5"/></svg>
+                    <span>Home</span>
+                </a>
+                <a href="{{ url_for('inbox') }}" class="{% if request.endpoint == 'inbox' %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M2 7L10.1649 12.7154C10.8261 13.1783 11.1567 13.4097 11.5163 13.4993C11.8339 13.5785 12.1661 13.5785 12.4837 13.4993C12.8433 13.4097 13.1739 13.1783 13.8351 12.7154L22 7M6.8 20H17.2C18.8802 20 19.7202 20 20.362 19.673C20.9265 19.3854 21.3854 18.9265 21.673 18.362C22 17.7202 22 16.8802 22 15.2V8.8C22 7.11984 22 6.27976 21.673 5.63803C21.3854 5.07354 20.9265 4.6146 20.362 4.32698C19.7202 4 18.8802 4 17.2 4H6.8C5.11984 4 4.27976 4 3.63803 4.32698C3.07354 4.6146 2.6146 5.07354 2.32698 5.63803C2 6.27976 2 7.11984 2 8.8V15.2C2 16.8802 2 17.7202 2.32698 18.362C2.6146 18.9265 3.07354 19.3854 3.63803 19.673C4.27976 20 5.11984 20 6.8 20Z" stroke="currentColor" stroke-width="2"/></svg>
+                    <span>Inbox</span>
+                </a>
+                <a href="{{ url_for('compose') }}" class="{% if request.endpoint == 'compose' %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 4V20M20 12L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    <span>Compose</span>
+                </a>
+                <a href="{{ url_for('profile') }}" class="{% if request.endpoint == 'profile' %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="7" r="4" fill="currentColor"/><path d="M4 20C4 16.6863 7.58172 14 12 14C16.4183 14 20 16.6863 20 20" stroke="currentColor" stroke-width="2"/></svg>
+                    <span>Profile</span>
+                </a>
+                <a href="{{ url_for('wallet') }}" class="{% if request.endpoint == 'wallet' %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M18 12H20M2 10H22" stroke="currentColor" stroke-width="2"/></svg>
+                    <span>Wallet</span>
+                </a>
+                <a href="{{ url_for('consent_settings') }}" class="{% if request.endpoint == 'consent_settings' %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 2C13.6569 2 15 3.34315 15 5C15 6.65685 13.6569 8 12 8C10.3431 8 9 6.65685 9 5C9 3.34315 10.3431 2 12 2ZM8.5 10C10.4853 10 12.1863 8.43985 12.4649 6.5H11.5351C11.2565 8.43985 9.55548 10 7.5 10H4C2.89543 10 2 10.8954 2 12V14C2 15.1046 2.89543 16 4 16H20C21.1046 16 22 15.1046 22 14V12C22 10.8954 21.1046 10 20 10H16.5C14.5147 10 12.8137 8.43985 12.5351 6.5H13.4649C13.7435 8.43985 15.4445 10 17.5 10" fill="currentColor"/></svg>
+                    <span>Privacy</span>
+                </a>
+                <a href="{{ url_for('account_settings') }}" class="{% if request.endpoint == 'account_settings' %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" stroke-width="2"/><path d="M19.4 15C19.1277 15.6171 19.2583 16.3378 19.73 16.82L19.79 16.88C20.1656 17.2551 20.3766 17.7642 20.3766 18.295C20.3766 18.8258 20.1656 19.3349 19.79 19.71C19.4149 20.0856 18.9058 20.2966 18.375 20.2966C17.8442 20.2966 17.3351 20.0856 16.96 19.71L16.9 19.65C16.4178 19.1783 15.6971 19.0477 15.08 19.32C14.4755 19.5791 14.0826 20.1724 14.08 20.83V21C14.08 22.1046 13.1846 23 12.08 23C10.9754 23 10.08 22.1046 10.08 21V20.91C10.0642 20.2327 9.63587 19.6339 8.99999 19.4M4.59999 9C4.87225 8.38288 4.74173 7.66214 4.26999 7.18L4.20999 7.12C3.83443 6.74485 3.62342 6.23577 3.62342 5.705C3.62342 5.17422 3.83443 4.66514 4.20999 4.29C4.58514 3.91443 5.09422 3.70342 5.62499 3.70342C6.15577 3.70342 6.66485 3.91443 7.03999 4.29L7.09999 4.35C7.58213 4.82174 8.30288 4.95226 8.91999 4.68C9.52447 4.42093 9.91739 3.82764 9.91999 3.17V3C9.91999 1.89543 10.8154 1 11.92 1C13.0246 1 13.92 1.89543 13.92 3V3.09C13.9226 3.74764 14.3155 4.34093 14.92 4.6C15.5371 4.87226 16.2578 4.74174 16.74 4.27L16.8 4.21C17.1751 3.83443 17.6842 3.62342 18.215 3.62342C18.7458 3.62342 19.2549 3.83443 19.63 4.21C20.0056 4.58515 20.2166 5.09423 20.2166 5.625C20.2166 6.15578 20.0056 6.66486 19.63 7.04L19.57 7.1C19.0983 7.58214 18.9677 8.30289 19.24 8.92C19.4991 9.52448 20.0924 9.9174 20.75 9.92H20.92C22.0246 9.92 22.92 10.8154 22.92 11.92C22.92 13.0246 22.0246 13.92 20.92 13.92H20.83C20.1724 13.9226 19.5791 14.3155 19.32 14.92" stroke="currentColor" stroke-width="2"/></svg>
+                    <span>Settings</span>
+                </a>
+                <a href="{{ url_for('logout') }}">
+                    <svg viewBox="0 0 20 20" fill="none"><path d="M13 10H4M13 10L10 7M13 10L10 13M19 10C19 14.9706 14.9706 19 10 19C5.02944 19 1 14.9706 1 10C1 5.02944 5.02944 1 10 1C14.9706 1 19 5.02944 19 10Z" stroke="#E15529" stroke-width="1.5"/></svg>
+                    <span>Logout</span>
+                </a>
+            </nav>
+        </aside>
 
-    <div class="header">
-        <h1>📧 Privra Webmail</h1>
-        <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle menu">
-            ☰
-        </button>
-        <nav id="mobile-nav">
-            <button class="mobile-nav-close" onclick="toggleMobileMenu()" aria-label="Close menu">
-                ✕
-            </button>
-            {% if session.email %}
-                <span style="margin-right: 1rem;">{{ session.email }}</span>
-                <a href="{{ url_for('dashboard') }}">Dashboard</a>
-                <a href="{{ url_for('inbox') }}">Inbox</a>
-                <a href="{{ url_for('compose') }}">Compose</a>
-                <a href="{{ url_for('profile') }}">Profile</a>
-                <a href="{{ url_for('wallet') }}">Wallet</a>
-                <a href="{{ url_for('consent_settings') }}">Privacy</a>
-                <a href="{{ url_for('rpc_settings') }}">RPC</a>
-                <a href="{{ url_for('account_settings') }}">Account</a>
-                <button class="theme-toggle" onclick="toggleTheme()" title="Change theme (click to cycle)">
-                    <span id="theme-toggle-btn">🌓</span>
-                    <span class="theme-indicator" id="theme-indicator">Auto</span>
-                </button>
-                <a href="{{ url_for('logout') }}">Logout</a>
-            {% endif %}
-        </nav>
-    </div>
-
-    <div class="container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-messages">
-                    {% for category, message in messages %}
-                        <div class="flash {{ category }}">{{ message }}</div>
-                    {% endfor %}
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Header -->
+            <header class="top-header">
+                <div class="header-greeting">
+                    <h1>
+                        <span class="wave">Hello,</span>
+                        <span class="name">{{ session.email.split('@')[0] if session.email else 'User' }}</span>
+                        👋🏾
+                    </h1>
                 </div>
-            {% endif %}
-        {% endwith %}
+                <div class="header-actions">
+                    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+                        <span id="theme-icon">🌙</span>
+                    </button>
+                    <div class="user-profile">
+                        <div class="user-avatar">
+                            {{ session.email[0].upper() if session.email else 'U' }}
+                        </div>
+                        <div class="user-info">
+                            <h6>{{ session.email.split('@')[0] if session.email else 'User' }}</h6>
+                            <p>{{ session.email if session.email else 'Not logged in' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </header>
 
-        {% block content %}{% endblock %}
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="content">
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Page Content -->
+            <div class="content">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
     </div>
 
-    <!-- Theme System -->
-    <script src="/static/theme-toggle.js"></script>
-
-    <!-- Mobile Menu Toggle -->
     <script>
-        function toggleMobileMenu() {
-            const nav = document.getElementById('mobile-nav');
-            const overlay = document.getElementById('mobile-menu-overlay');
-
-            nav.classList.toggle('active');
-            overlay.classList.toggle('active');
-
-            // Prevent body scroll when menu is open
-            if (nav.classList.contains('active')) {
-                document.body.style.overflow = 'hidden';
-            } else {
-                document.body.style.overflow = '';
-            }
+        // Theme Toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            document.getElementById('theme-icon').textContent = newTheme === 'dark' ? '☀️' : '🌙';
         }
 
-        // Close menu when clicking on a link (on mobile)
-        document.addEventListener('DOMContentLoaded', function() {
-            const nav = document.getElementById('mobile-nav');
-            if (nav) {
-                const links = nav.querySelectorAll('a');
-                links.forEach(link => {
-                    link.addEventListener('click', function() {
-                        // Check if mobile menu is active
-                        if (nav.classList.contains('active')) {
-                            toggleMobileMenu();
-                        }
-                    });
-                });
-            }
-        });
-    </script>
-
-    <!-- Service Worker Registration -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/service-worker.js')
-                    .then((registration) => {
-                        console.log('✓ Service Worker registered successfully:', registration.scope);
-                    })
-                    .catch((error) => {
-                        console.log('Service Worker registration failed:', error);
-                    });
-            });
-        }
-
-        // Install prompt
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-
-            // Show install button (can be customized later)
-            console.log('✓ PWA install prompt available');
-
-            // Optionally show custom install button
-            // Example: document.getElementById('install-button').style.display = 'block';
-        });
-
-        // Track installation
-        window.addEventListener('appinstalled', () => {
-            console.log('✓ Privra Mail PWA installed');
-            deferredPrompt = null;
-        });
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        document.getElementById('theme-icon').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
     </script>
 </body>
 </html>
