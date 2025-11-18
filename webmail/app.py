@@ -34,6 +34,7 @@ from wallet_service import wallet_service
 from folder_service import folder_service
 from ai_labeling import ai_labeling_service
 from session_manager import session_manager
+from alias_service import alias_service
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -790,6 +791,99 @@ def revoke_all_sessions():
     flash('All other sessions have been signed out', 'success')
 
     return redirect(url_for('sessions'))
+
+
+# ==================== ALIAS MANAGEMENT ROUTES (Priority 1: Privacy Shield) ====================
+
+@app.route('/aliases')
+def aliases():
+    """Alias management page - Dynamic Shield Aliasing"""
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
+    user_email = session['email']
+
+    try:
+        # Get all aliases (including burned ones in separate section)
+        active_aliases = [a for a in alias_service.list_aliases(user_email, include_burned=False)]
+        burned_aliases = [a for a in alias_service.list_aliases(user_email, include_burned=True) if a['burned_at']]
+
+        return render_template('aliases.html',
+                             active_aliases=active_aliases,
+                             burned_aliases=burned_aliases)
+    except Exception as e:
+        flash(f'Error loading aliases: {str(e)}', 'error')
+        return redirect(url_for('inbox'))
+
+
+@app.route('/aliases/generate', methods=['POST'])
+def generate_alias():
+    """Generate a new alias - API endpoint"""
+    if 'email' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    user_email = session['email']
+
+    try:
+        # Get parameters from request
+        data = request.get_json()
+        service_name = data.get('service_name', 'Unknown Service')
+        custom_prefix = data.get('custom_prefix')
+        description = data.get('description')
+
+        # Generate alias
+        result = alias_service.generate_alias(
+            user_email=user_email,
+            service_name=service_name,
+            custom_prefix=custom_prefix,
+            description=description
+        )
+
+        return jsonify(result), 201
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/aliases/<int:alias_id>/burn', methods=['POST'])
+def burn_alias(alias_id):
+    """Burn an alias (irreversible) - Kill Switch"""
+    if 'email' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    user_email = session['email']
+
+    try:
+        success = alias_service.burn_alias(alias_id, user_email)
+
+        if success:
+            flash('🔥 Alias burned successfully. Senders will now receive 550 errors.', 'success')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Alias not found or already burned'}), 404
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/aliases/<int:alias_id>', methods=['GET'])
+def get_alias(alias_id):
+    """Get alias details - API endpoint"""
+    if 'email' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    user_email = session['email']
+
+    try:
+        alias = alias_service.get_alias(alias_id, user_email)
+
+        if alias:
+            return jsonify(alias)
+        else:
+            return jsonify({'error': 'Alias not found'}), 404
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/inbox')

@@ -451,6 +451,10 @@
                     <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M18 12H20M2 10H22" stroke="currentColor" stroke-width="2"/></svg>
                     <span>Wallet</span>
                 </a>
+                <a href="{{ url_for('aliases') }}" class="{% if request.endpoint == 'aliases' %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>Shield Aliases</span>
+                </a>
                 <a href="{{ url_for('consent_settings') }}" class="{% if request.endpoint == 'consent_settings' %}active{% endif %}">
                     <svg viewBox="0 0 24 24" fill="none"><path d="M12 2C13.6569 2 15 3.34315 15 5C15 6.65685 13.6569 8 12 8C10.3431 8 9 6.65685 9 5C9 3.34315 10.3431 2 12 2ZM8.5 10C10.4853 10 12.1863 8.43985 12.4649 6.5H11.5351C11.2565 8.43985 9.55548 10 7.5 10H4C2.89543 10 2 10.8954 2 12V14C2 15.1046 2.89543 16 4 16H20C21.1046 16 22 15.1046 22 14V12C22 10.8954 21.1046 10 20 10H16.5C14.5147 10 12.8137 8.43985 12.5351 6.5H13.4649C13.7435 8.43985 15.4445 10 17.5 10" fill="currentColor"/></svg>
                     <span>Privacy</span>
