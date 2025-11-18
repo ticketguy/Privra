@@ -3,64 +3,286 @@
 {% block title %}Register - Privra Webmail{% endblock %}
 
 {% block content %}
-<div class="card" style="max-width: 500px; margin: 2rem auto;">
-    <h2 style="text-align: center; margin-bottom: 2rem;">Create Account</h2>
+<style>
+    .register-container {
+        min-height: calc(100vh - 120px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1rem;
+        position: relative;
+        overflow: hidden;
+    }
 
-    <div style="background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; padding: 15px; border-radius: 5px; margin-bottom: 1.5rem;">
-        <strong>What you'll get:</strong>
-        <ul style="margin: 10px 0 0 20px;">
-            <li>End-to-end encrypted email</li>
-            <li>AI-powered email categorization</li>
-            <li>Consent-based spam protection</li>
-            <li>PortID zero-knowledge authentication (optional)</li>
-        </ul>
-    </div>
+    /* Animated liquid gradient background */
+    .register-container::before {
+        content: '';
+        position: absolute;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle at 20% 50%, rgba(118, 75, 162, 0.15) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 80%, rgba(102, 126, 234, 0.15) 0%, transparent 50%),
+                    radial-gradient(circle at 40% 20%, rgba(240, 147, 251, 0.1) 0%, transparent 50%);
+        animation: gradientShift 15s ease infinite;
+        z-index: 0;
+    }
 
-    <form method="POST" action="{{ url_for('register') }}">
-        <div class="form-group">
-            <label for="email">Email Address</label>
-            <input type="email" id="email" name="email" class="form-control" required
-                   placeholder="username@yourdomain.com">
-            <small style="color: #666;">Must be a domain configured on this server</small>
+    @keyframes gradientShift {
+        0%, 100% { transform: translate(0, 0) rotate(0deg); }
+        33% { transform: translate(-5%, -5%) rotate(60deg); }
+        66% { transform: translate(5%, 5%) rotate(-60deg); }
+    }
+
+    .register-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 24px;
+        box-shadow: 0 8px 32px rgba(118, 75, 162, 0.2),
+                    inset 0 1px 1px rgba(255, 255, 255, 0.1);
+        max-width: 540px;
+        width: 100%;
+        padding: 3rem 2.5rem;
+        border: 1px solid var(--glass-border);
+        position: relative;
+        z-index: 1;
+        overflow: hidden;
+    }
+
+    .register-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+        animation: shimmer 3s infinite;
+    }
+
+    @keyframes shimmer {
+        0% { left: -100%; }
+        100% { left: 100%; }
+    }
+
+    .register-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .register-logo {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .register-title {
+        font-size: 1.75rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 0.5rem;
+    }
+
+    .register-subtitle {
+        color: var(--text-light);
+        font-size: 0.95rem;
+    }
+
+    .features-box {
+        background: linear-gradient(135deg, rgba(118, 75, 162, 0.1), rgba(102, 126, 234, 0.1));
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 2rem;
+    }
+
+    .features-title {
+        font-weight: 600;
+        color: var(--text-dark);
+        margin-bottom: 0.75rem;
+        font-size: 0.95rem;
+    }
+
+    .features-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .features-list li {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-dark);
+        font-size: 0.9rem;
+    }
+
+    .features-list li::before {
+        content: '✓';
+        color: var(--primary);
+        font-weight: bold;
+        font-size: 1.1rem;
+    }
+
+    .register-form .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .register-form label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        color: var(--text-dark);
+        font-size: 0.9rem;
+    }
+
+    .register-form input {
+        width: 100%;
+        padding: 0.85rem 1rem;
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: var(--bg-main);
+        color: var(--text-dark);
+    }
+
+    .register-form input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
+    }
+
+    .register-form small {
+        display: block;
+        margin-top: 0.25rem;
+        color: var(--text-light);
+        font-size: 0.85rem;
+    }
+
+    .register-btn {
+        width: 100%;
+        padding: 0.95rem;
+        font-size: 1rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 0.5rem;
+    }
+
+    .register-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(118, 75, 162, 0.3);
+    }
+
+    .warning-box {
+        background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 152, 0, 0.15));
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 193, 7, 0.3);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-top: 1.5rem;
+        font-size: 0.9rem;
+    }
+
+    .warning-title {
+        font-weight: 600;
+        color: var(--text-dark);
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .warning-box ul {
+        margin: 0.5rem 0 0.5rem 1.5rem;
+        color: var(--text-dark);
+    }
+
+    .login-link {
+        text-align: center;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border);
+        color: var(--text-light);
+    }
+
+    .login-link a {
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .login-link a:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<div class="register-container">
+    <div class="register-card">
+        <div class="register-header">
+            <div class="register-logo">🔐</div>
+            <h1 class="register-title">Create Your Account</h1>
+            <p class="register-subtitle">Join Privra's zero-knowledge email platform</p>
         </div>
 
-        <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password" class="form-control" required
-                   minlength="8" placeholder="At least 8 characters">
+        <div class="features-box">
+            <div class="features-title">What you'll get:</div>
+            <ul class="features-list">
+                <li>End-to-end encrypted email</li>
+                <li>Multi-chain crypto wallet (Solana + EVM)</li>
+                <li>Zero-knowledge keyring storage</li>
+                <li>AI-powered email categorization</li>
+                <li>Pay-to-send spam protection</li>
+            </ul>
         </div>
 
-        <div class="form-group">
-            <label for="confirm_password">Confirm Password</label>
-            <input type="password" id="confirm_password" name="confirm_password" class="form-control" required
-                   minlength="8" placeholder="Re-enter password">
+        <form method="POST" action="{{ url_for('register') }}" class="register-form">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required autofocus placeholder="you@privra.xyz">
+                <small>Must be on a domain configured for this server</small>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required minlength="8" placeholder="At least 8 characters">
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" required minlength="8" placeholder="Re-enter password">
+            </div>
+
+            <button type="submit" class="register-btn">Create Account</button>
+        </form>
+
+        <div class="warning-box">
+            <div class="warning-title">
+                <span>⚠️</span>
+                <span>Important: Save Your Recovery Key</span>
+            </div>
+            <p>After registration, you'll receive a <strong>Recovery Key</strong>. This is essential for:</p>
+            <ul>
+                <li>Accessing your encrypted emails on new devices</li>
+                <li>Recovering your crypto wallet private keys</li>
+                <li>Decrypting your zero-knowledge keyring</li>
+            </ul>
+            <strong>Save it securely. We cannot recover it for you.</strong>
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%;">Create Account</button>
-    </form>
-
-    <div style="text-align: center; margin-top: 1.5rem;">
-        <p>Already have an account? <a href="{{ url_for('login') }}" style="color: #3498db;">Login here</a></p>
-    </div>
-
-    <div style="background: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 15px; border-radius: 5px; margin-top: 1.5rem; font-size: 0.9em;">
-        <strong>Important:</strong> After registration, you'll receive a <strong>Recovery Key</strong>.
-        This key is essential for:
-        <ul style="margin: 5px 0 0 20px;">
-            <li>Recovering access to encrypted emails</li>
-            <li>Decrypting your private encryption key</li>
-        </ul>
-        <strong>Save it in a secure location. We cannot recover it for you.</strong>
+        <div class="login-link">
+            Already have an account? <a href="{{ url_for('login') }}">Sign in here</a>
+        </div>
     </div>
 </div>
-
-<style>
-.form-control {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 1rem;
-}
-</style>
 {% endblock %}
