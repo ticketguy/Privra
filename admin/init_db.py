@@ -563,6 +563,31 @@ def init_database():
         CREATE INDEX IF NOT EXISTS idx_session_token ON user_sessions(session_token)
     """)
 
+    # Create email aliases table (Dynamic Shield Aliasing - Priority 1)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS email_aliases (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            alias VARCHAR(255) UNIQUE NOT NULL,
+            service_name VARCHAR(255),
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_used TIMESTAMP,
+            email_count INT DEFAULT 0,
+            is_active BOOLEAN DEFAULT TRUE,
+            burned_at TIMESTAMP
+        )
+    """)
+
+    # Create indexes for email aliases
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_aliases_lookup ON email_aliases(alias) WHERE is_active = TRUE
+    """)
+
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_aliases_user ON email_aliases(user_email)
+    """)
+
     # Create default admin user (admin/admin) - CHANGE THIS!
     import bcrypt
     default_password = bcrypt.hashpw(b'admin', bcrypt.gensalt()).decode('utf-8')
