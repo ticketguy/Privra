@@ -527,6 +527,18 @@ def init_database():
         )
     """)
 
+    # Create PortID encrypted backups table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS portid_backups (
+            id SERIAL PRIMARY KEY,
+            user_email VARCHAR(255) UNIQUE NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+            app_id VARCHAR(100) NOT NULL,
+            encrypted_data TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # Create default admin user (admin/admin) - CHANGE THIS!
     import bcrypt
     default_password = bcrypt.hashpw(b'admin', bcrypt.gensalt()).decode('utf-8')

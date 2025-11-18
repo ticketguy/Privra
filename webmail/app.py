@@ -330,39 +330,8 @@ def login():
     if request.method == 'POST':
         email_addr = request.form.get('email')
         password = request.form.get('password')
-        use_portid = request.form.get('use_portid', '').lower() == 'true'
 
-        # Try PortID authentication first if enabled
-        if portid_service.is_enabled() and use_portid:
-            result = portid_service.login(email_addr, password)
-            if result and result.get('success'):
-                # Look up user's IMAP password from database
-                try:
-                    conn = get_db()
-                    cur = conn.cursor()
-                    cur.execute("SELECT email, password FROM users WHERE email = %s AND active = TRUE", (email_addr,))
-                    user_data = cur.fetchone()
-                    cur.close()
-                    conn.close()
-
-                    if user_data and user_data[1]:
-                        # Test IMAP connection with database password
-                        mail = connect_imap(user_data[0], user_data[1])
-                        if mail:
-                            mail.logout()
-                            session.permanent = True
-                            session['email'] = user_data[0]
-                            session['password'] = user_data[1]
-                            session['auth_type'] = 'portid'
-                            session['portid'] = result.get('portid')
-                            flash('Login successful via PortID!', 'success')
-                            return redirect(url_for('inbox'))
-                except Exception as e:
-                    print(f"PortID login error: {e}")
-                    flash('PortID authentication failed', 'error')
-                    return render_template('login.html', portid_enabled=True)
-
-        # Fall back to legacy IMAP authentication
+        # Authenticate via IMAP
         mail = connect_imap(email_addr, password)
         if mail:
             mail.logout()
@@ -412,7 +381,7 @@ def login():
         else:
             flash('Invalid email or password', 'error')
 
-    return render_template('login.html', portid_enabled=portid_service.is_enabled())
+    return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -622,6 +591,91 @@ def get_public_key(email):
             }), 404
 
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/portid/backup', methods=['POST'])
+def portid_backup():
+    """
+    PortID backup endpoint - stores encrypted user data
+
+    The PortID SDK encrypts data client-side and POSTs it here.
+    We store the encrypted blob in the database without ever decrypting it.
+    """
+    try:
+        data = request.get_json()
+        user_email = data.get('user_email')
+        app_id = data.get('app_id')
+        encrypted_data = data.get('encrypted_data')
+
+        if not user_email or not app_id or not encrypted_data:
+            return jsonify({"error": "Missing required fields"}), 400
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Insert or update encrypted backup
+        cur.execute("""
+            INSERT INTO portid_backups (user_email, app_id, encrypted_data, updated_at)
+            VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_email)
+            DO UPDATE SET
+                encrypted_data = EXCLUDED.encrypted_data,
+                updated_at = CURRENT_TIMESTAMP
+        """, (user_email, app_id, encrypted_data))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({"success": True, "message": "Backup stored"}), 200
+
+    except Exception as e:
+        print(f"PortID backup error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/portid/restore', methods=['POST'])
+def portid_restore():
+    """
+    PortID restore endpoint - retrieves encrypted user data
+
+    The PortID SDK fetches the encrypted blob from here and decrypts it client-side.
+    We never see the decrypted data.
+    """
+    try:
+        data = request.get_json()
+        user_email = data.get('user_email')
+        app_id = data.get('app_id')
+
+        if not user_email or not app_id:
+            return jsonify({"error": "Missing required fields"}), 400
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Fetch encrypted backup
+        cur.execute("""
+            SELECT encrypted_data, updated_at
+            FROM portid_backups
+            WHERE user_email = %s AND app_id = %s
+        """, (user_email, app_id))
+
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if result:
+            return jsonify({
+                "success": True,
+                "encrypted_data": result[0],
+                "updated_at": result[1].isoformat() if result[1] else None
+            }), 200
+        else:
+            return jsonify({"error": "No backup found"}), 404
+
+    except Exception as e:
+        print(f"PortID restore error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/logout')
