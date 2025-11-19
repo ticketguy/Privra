@@ -152,9 +152,36 @@
                         🔒 End-to-end Encrypted
                     </span>
                 {% endif %}
+
+                <!-- Sanitization Badge -->
+                {% if session.last_sanitization %}
+                    <span class="verification-badge" style="background: #667eea;" title="Active Sanitization protected this email">
+                        🛡️ {{ session.last_sanitization.removed_pixels + session.last_sanitization.rewritten_links }} threats blocked
+                    </span>
+                {% endif %}
             </div>
         </div>
     </div>
+
+    <!-- Sanitization Details (if any) -->
+    {% if session.last_sanitization and (session.last_sanitization.removed_pixels > 0 or session.last_sanitization.rewritten_links > 0) %}
+    <div style="background: rgba(102, 126, 234, 0.1); border-left: 3px solid #667eea; padding: 1rem; margin-bottom: 1rem; border-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <strong style="color: #667eea;">🛡️ Active Sanitization</strong>
+        </div>
+        <div style="color: rgba(255, 255, 255, 0.8); font-size: 0.9rem;">
+            {% if session.last_sanitization.removed_pixels > 0 %}
+            <div>✓ Removed {{ session.last_sanitization.removed_pixels }} tracking pixel{{ 's' if session.last_sanitization.removed_pixels > 1 else '' }}</div>
+            {% endif %}
+            {% if session.last_sanitization.rewritten_links > 0 %}
+            <div>✓ Secured {{ session.last_sanitization.rewritten_links }} suspicious link{{ 's' if session.last_sanitization.rewritten_links > 1 else '' }}</div>
+            {% endif %}
+            {% if session.last_sanitization.removed_scripts > 0 %}
+            <div>✓ Blocked {{ session.last_sanitization.removed_scripts }} script{{ 's' if session.last_sanitization.removed_scripts > 1 else '' }}</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 
     <div class="email-header">
         <h2>{{ subject }}</h2>
