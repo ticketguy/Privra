@@ -35,6 +35,7 @@ from folder_service import folder_service
 from ai_labeling import ai_labeling_service
 from session_manager import session_manager
 from alias_service import alias_service
+from email_sanitizer import email_sanitizer
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -203,8 +204,13 @@ def get_sender_verification(email_addr):
         }
 
 def get_email_body(msg):
-    """Extract email body from message"""
+    """
+    Extract and sanitize email body from message.
+    Removes tracking pixels and rewrites suspicious links.
+    """
     body = ""
+    is_html = False
+
     if msg.is_multipart():
         for part in msg.walk():
             content_type = part.get_content_type()
@@ -217,13 +223,36 @@ def get_email_body(msg):
             elif content_type == "text/html" and not body:
                 try:
                     body = part.get_payload(decode=True).decode(errors='replace')
+                    is_html = True
                 except:
                     pass
     else:
         try:
             body = msg.get_payload(decode=True).decode(errors='replace')
+            # Check if it's HTML
+            if '<html' in body.lower() or '<body' in body.lower():
+                is_html = True
         except:
             body = msg.get_payload()
+
+    # Sanitize HTML emails
+    if is_html and body:
+        user_email = session.get('email', '')
+        sanitization_result = email_sanitizer.sanitize_html(body, user_email)
+
+        # Store sanitization stats in session for display
+        session['last_sanitization'] = {
+            'removed_pixels': sanitization_result['removed_pixels'],
+            'rewritten_links': sanitization_result['rewritten_links'],
+            'removed_scripts': sanitization_result['removed_scripts'],
+            'warnings': sanitization_result['warnings']
+        }
+
+        body = sanitization_result['sanitized_html']
+    else:
+        # Clear sanitization stats for plain text emails
+        session.pop('last_sanitization', None)
+
     return body
 
 def allowed_file(filename):
@@ -884,6 +913,28 @@ def get_alias(alias_id):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ==================== SAFE LINK PROXY (Priority 1: Active Sanitization) ====================
+
+@app.route('/click/safe')
+def safe_link_proxy():
+    """
+    Safe link proxy endpoint.
+    Shows warning page before redirecting to potentially suspicious links.
+    """
+    encoded_url = request.args.get('url')
+
+    if not encoded_url:
+        flash('Missing URL parameter', 'error')
+        return redirect(url_for('inbox'))
+
+    # Decode the original URL
+    original_url = email_sanitizer.decode_safe_url(encoded_url)
+
+    # Render warning page (user can choose to continue or go back)
+    return render_template('safe_link_warning.html',
+                         original_url=original_url)
 
 
 @app.route('/inbox')

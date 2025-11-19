@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}⚠️ Suspicious Link Warning - Privra{% endblock %}
+
+{% block extra_css %}
+<style>
+    .warning-container {
+        max-width: 700px;
+        margin: 4rem auto;
+        padding: 2rem;
+    }
+
+    .warning-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: 24px;
+        padding: 3rem;
+        border: 2px solid rgba(239, 68, 68, 0.3);
+        box-shadow: 0 8px 32px rgba(239, 68, 68, 0.2);
+        text-align: center;
+    }
+
+    .warning-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+
+    .warning-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #ef4444;
+        margin-bottom: 1rem;
+    }
+
+    .warning-message {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+    }
+
+    .url-display {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 1rem;
+        border-radius: 12px;
+        word-break: break-all;
+        font-family: monospace;
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.8);
+        margin-bottom: 2rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .warning-reasons {
+        text-align: left;
+        background: rgba(239, 68, 68, 0.1);
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .warning-reasons h3 {
+        color: #ef4444;
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+    }
+
+    .warning-reasons ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    .warning-reasons li {
+        padding: 0.5rem 0;
+        color: rgba(255, 255, 255, 0.8);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .warning-reasons li::before {
+        content: "⚠️";
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-top: 2rem;
+    }
+
+    .btn-danger, .btn-safe {
+        padding: 1rem 2rem;
+        border-radius: 12px;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1rem;
+    }
+
+    .btn-danger {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+    }
+
+    .btn-danger:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+    }
+
+    .btn-safe {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-safe:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .safety-tips {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .safety-tips h4 {
+        color: rgba(255, 255, 255, 0.9);
+        margin-bottom: 1rem;
+    }
+
+    .safety-tips ul {
+        text-align: left;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="warning-container">
+    <div class="warning-card">
+        <div class="warning-icon">⚠️</div>
+
+        <h1 class="warning-title">Suspicious Link Detected</h1>
+
+        <p class="warning-message">
+            Privra's Active Sanitization system has identified this link as potentially suspicious.
+            Proceeding may expose you to phishing, malware, or tracking.
+        </p>
+
+        <div class="url-display">
+            {{ original_url }}
+        </div>
+
+        <div class="warning-reasons">
+            <h3>Why is this link suspicious?</h3>
+            <ul>
+                {% if original_url|length < 30 %}
+                <li>URL is suspiciously short (likely a URL shortener)</li>
+                {% endif %}
+                {% if 'bit.ly' in original_url or 'tinyurl' in original_url or 'goo.gl' in original_url %}
+                <li>URL shortener detected (hides true destination)</li>
+                {% endif %}
+                {% if 'click.' in original_url or 'track.' in original_url or 'redirect.' in original_url %}
+                <li>Tracking domain detected</li>
+                {% endif %}
+                <li>Link was rewritten by Privra for your protection</li>
+                <li>Always verify the destination before clicking</li>
+            </ul>
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn-safe" onclick="window.history.back()">
+                ← Go Back (Recommended)
+            </button>
+            <a href="{{ original_url }}" class="btn-danger" target="_blank" rel="noopener noreferrer">
+                Continue Anyway →
+            </a>
+        </div>
+
+        <div class="safety-tips">
+            <h4>🛡️ Safety Tips</h4>
+            <ul>
+                <li>Verify the sender's email address is legitimate</li>
+                <li>Check for spelling errors or unusual domains</li>
+                <li>Never enter passwords on suspicious sites</li>
+                <li>Use the "Burn Alias" feature if you receive spam</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
