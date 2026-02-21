@@ -923,6 +923,9 @@ def safe_link_proxy():
     Safe link proxy endpoint.
     Shows warning page before redirecting to potentially suspicious links.
     """
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
     encoded_url = request.args.get('url')
 
     if not encoded_url:
