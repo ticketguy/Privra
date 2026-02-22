@@ -131,7 +131,7 @@
         .sidebar nav a:hover,
         .sidebar nav a.active {
             color: var(--primary);
-            background: rgba(255, 130, 0, 0.1);
+            background: rgba(118, 75, 162, 0.1);
             border-left-color: var(--primary);
         }
 
@@ -271,7 +271,7 @@
 
         .theme-toggle:hover {
             transform: scale(1.1);
-            background: rgba(255, 130, 0, 0.2);
+            background: rgba(118, 75, 162, 0.2);
         }
 
         .user-profile {
@@ -379,19 +379,33 @@
         @media (max-width: 768px) {
             .sidebar {
                 transform: translateX(-100%);
+                z-index: 30;
             }
 
             .sidebar.open {
                 transform: translateX(0);
+                box-shadow: 4px 0 24px rgba(0,0,0,0.15);
             }
 
             .main-content {
                 margin-left: 0;
             }
 
-            .top-header,
+            .top-header {
+                left: 0 !important;
+                padding: 12px 16px;
+            }
+
             .content {
-                padding: 16px 24px;
+                padding: 20px 16px;
+            }
+
+            .search-bar {
+                display: none;
+            }
+
+            .user-info {
+                display: none;
             }
         }
 

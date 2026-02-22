@@ -4,7 +4,7 @@
 
 {% block content %}
 <div style="max-width: 1200px; margin: 0 auto;">
-    <h2 style="margin-bottom: 2rem; color: white; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); font-size: 2rem;">Welcome, {{ session.email }}</h2>
+    <h2 style="margin-bottom: 2rem; color: var(--text-dark); font-size: 1.75rem; font-weight: 700;">Welcome, <span style="background: linear-gradient(135deg, var(--primary), var(--primary-dark)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">{{ session.email.split('@')[0] if session.email else 'User' }}</span> 👋</h2>
 
     <!-- Quick Stats -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
@@ -168,15 +168,13 @@
 </div>
 
 <style>
-/* Glassmorphic stat cards */
+/* Stat cards */
 .stat-card {
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
     border-radius: 16px;
     padding: 1.5rem;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--card-shadow);
     display: flex;
     align-items: center;
     gap: 1rem;
@@ -184,112 +182,113 @@
     animation: fadeInUp 0.5s ease-out;
 }
 .stat-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(118, 75, 162, 0.15);
 }
 .stat-icon {
-    font-size: 2em;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
+    font-size: 1.75em;
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 .stat-content {
     flex: 1;
 }
 .stat-value {
-    font-size: 1.75em;
-    font-weight: bold;
-    color: white;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    font-size: 1.6em;
+    font-weight: 700;
+    color: var(--text-dark);
 }
 .stat-label {
-    font-size: 0.9em;
-    color: rgba(255, 255, 255, 0.9);
-    margin-top: 0.25rem;
+    font-size: 0.85em;
+    color: var(--text-light);
+    margin-top: 0.2rem;
+    font-weight: 500;
 }
 .stat-sublabel {
-    font-size: 0.8em;
-    color: rgba(255, 255, 255, 0.7);
-    margin-top: 0.25rem;
+    font-size: 0.78em;
+    color: var(--text-light);
+    margin-top: 0.15rem;
+    opacity: 0.8;
 }
 
-/* Glassmorphic feature boxes */
+/* Feature boxes */
 .feature-box {
     padding: 1.5rem;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 16px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
     transition: all 0.3s ease;
 }
 .feature-box:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.4);
+    border-color: var(--glass-border);
     transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 24px rgba(118, 75, 162, 0.12);
 }
 .feature-box h4 {
-    color: white;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    color: var(--text-dark);
+    font-size: 1rem;
+    font-weight: 600;
 }
 .feature-box p {
-    color: rgba(255, 255, 255, 0.85) !important;
+    color: var(--text-light) !important;
+    font-size: 0.875rem !important;
 }
 
-/* Glassmorphic badges */
+/* Badges */
 .badge {
     display: inline-block;
-    padding: 6px 12px;
-    border-radius: 12px;
-    font-size: 0.8em;
-    font-weight: bold;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    padding: 5px 11px;
+    border-radius: 10px;
+    font-size: 0.78em;
+    font-weight: 600;
 }
 .badge-success {
-    background: rgba(39, 174, 96, 0.8);
-    color: white;
+    background: rgba(39, 174, 96, 0.15);
+    color: #27ae60;
+    border: 1px solid rgba(39, 174, 96, 0.3);
 }
 .badge-warning {
-    background: rgba(243, 156, 18, 0.8);
-    color: white;
+    background: rgba(243, 156, 18, 0.15);
+    color: #e67e22;
+    border: 1px solid rgba(243, 156, 18, 0.3);
 }
 .badge-info {
-    background: rgba(52, 152, 219, 0.8);
-    color: white;
+    background: rgba(52, 152, 219, 0.15);
+    color: #2980b9;
+    border: 1px solid rgba(52, 152, 219, 0.3);
 }
 .badge-secondary {
-    background: rgba(149, 165, 166, 0.8);
-    color: white;
+    background: rgba(149, 165, 166, 0.15);
+    color: var(--text-light);
+    border: 1px solid var(--border);
 }
 
-/* Glassmorphic action buttons */
+/* Quick action buttons */
 .action-btn {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
     padding: 1.5rem;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 16px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
     text-decoration: none;
-    color: white;
+    color: var(--text-dark);
     transition: all 0.3s ease;
+    font-weight: 500;
 }
 .action-btn:hover {
-    background: rgba(255, 255, 255, 0.25);
-    border-color: rgba(255, 255, 255, 0.5);
-    transform: translateY(-5px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    border-color: var(--primary);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(118, 75, 162, 0.15);
+    color: var(--primary);
 }
 
 @keyframes fadeInUp {

@@ -1,203 +1,544 @@
 {% extends "base.html" %}
 
-{% block title %}Consent Settings - Privra Webmail{% endblock %}
+{% block title %}Privacy & Consent Settings - Privra Webmail{% endblock %}
+
+{% block extra_css %}
+<style>
+    .privacy-page {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .privacy-page-header {
+        margin-bottom: 2rem;
+    }
+
+    .privacy-page-header h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin-bottom: 0.25rem;
+    }
+
+    .privacy-page-header p {
+        color: var(--text-light);
+        font-size: 0.95rem;
+    }
+
+    .settings-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 1.75rem;
+        margin-bottom: 1.5rem;
+        box-shadow: var(--card-shadow);
+    }
+
+    .card-title {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* Toggle options */
+    .toggle-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+        background: var(--bg-main);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        margin-bottom: 0.75rem;
+        cursor: pointer;
+        transition: border-color 0.2s;
+    }
+
+    .toggle-option:hover {
+        border-color: var(--glass-border);
+    }
+
+    .toggle-option input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        margin-top: 2px;
+        flex-shrink: 0;
+        accent-color: var(--primary);
+        cursor: pointer;
+    }
+
+    .toggle-option-info h4 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        margin: 0 0 0.25rem 0;
+    }
+
+    .toggle-option-info p {
+        font-size: 0.85rem;
+        color: var(--text-light);
+        margin: 0;
+        line-height: 1.5;
+    }
+
+    /* Payment panel */
+    .payment-panel {
+        background: rgba(243, 156, 18, 0.06);
+        border: 1px solid rgba(243, 156, 18, 0.25);
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-top: 0.75rem;
+    }
+
+    .payment-panel-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        cursor: pointer;
+    }
+
+    .payment-panel-header input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        margin-top: 2px;
+        flex-shrink: 0;
+        accent-color: var(--primary);
+        cursor: pointer;
+    }
+
+    .payment-panel-header h4 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        margin: 0 0 0.25rem 0;
+    }
+
+    .payment-panel-header p {
+        font-size: 0.85rem;
+        color: var(--text-light);
+        margin: 0;
+    }
+
+    .payment-fields {
+        margin-top: 1.25rem;
+        display: grid;
+        gap: 1rem;
+    }
+
+    .payment-field-row {
+        display: grid;
+        gap: 0.35rem;
+    }
+
+    .payment-field-row label {
+        font-size: 0.825rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    .payment-field-row input {
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg-main);
+        color: var(--text-dark);
+        font-size: 0.95rem;
+        transition: border-color 0.2s;
+        width: 100%;
+    }
+
+    .payment-field-row input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
+    }
+
+    .payment-field-row small {
+        font-size: 0.8rem;
+        color: var(--text-light);
+    }
+
+    .btn-save {
+        padding: 0.8rem 2rem;
+        background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-top: 1.25rem;
+        box-shadow: 0 4px 12px rgba(118, 75, 162, 0.25);
+    }
+
+    .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(118, 75, 162, 0.35);
+    }
+
+    /* Add sender row */
+    .add-sender-row {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1.25rem;
+        flex-wrap: wrap;
+    }
+
+    .add-sender-row input {
+        flex: 1;
+        min-width: 180px;
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg-main);
+        color: var(--text-dark);
+        font-size: 0.9rem;
+        transition: border-color 0.2s;
+    }
+
+    .add-sender-row input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
+    }
+
+    .btn-add-allow {
+        padding: 0.75rem 1.25rem;
+        background: rgba(39, 174, 96, 0.15);
+        color: #27ae60;
+        border: 1px solid rgba(39, 174, 96, 0.3);
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn-add-allow:hover {
+        background: rgba(39, 174, 96, 0.25);
+        transform: translateY(-1px);
+    }
+
+    .btn-add-block {
+        padding: 0.75rem 1.25rem;
+        background: rgba(239, 68, 68, 0.12);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn-add-block:hover {
+        background: rgba(239, 68, 68, 0.22);
+        transform: translateY(-1px);
+    }
+
+    /* Table */
+    .sender-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .sender-table th {
+        padding: 0.75rem 1rem;
+        text-align: left;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--text-light);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid var(--border);
+        background: var(--bg-main);
+    }
+
+    .sender-table th:first-child { border-radius: 8px 0 0 0; }
+    .sender-table th:last-child  { border-radius: 0 8px 0 0; }
+
+    .sender-table td {
+        padding: 0.875rem 1rem;
+        color: var(--text-dark);
+        font-size: 0.9rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .sender-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .sender-table tr:hover td {
+        background: rgba(118, 75, 162, 0.03);
+    }
+
+    .td-light { color: var(--text-light); font-size: 0.85rem; }
+
+    .btn-remove {
+        padding: 0.35rem 0.75rem;
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-remove:hover {
+        background: rgba(239, 68, 68, 0.2);
+    }
+
+    .empty-table {
+        text-align: center;
+        padding: 2.5rem;
+        color: var(--text-light);
+        background: var(--bg-main);
+        border-radius: 10px;
+        font-size: 0.9rem;
+    }
+
+    /* Info box */
+    .info-box {
+        background: rgba(118, 75, 162, 0.06);
+        border: 1px solid rgba(118, 75, 162, 0.15);
+        border-radius: 12px;
+        padding: 1.25rem;
+    }
+
+    .info-box h4 {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: var(--primary);
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .info-box ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .info-box li {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-dark);
+        line-height: 1.5;
+    }
+
+    .info-box li::before {
+        content: "•";
+        color: var(--primary);
+        font-weight: bold;
+        flex-shrink: 0;
+    }
+
+    @media (max-width: 600px) {
+        .sender-table th:nth-child(3),
+        .sender-table td:nth-child(3) { display: none; }
+        .add-sender-row { flex-direction: column; }
+        .btn-add-allow, .btn-add-block { width: 100%; text-align: center; }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div style="margin-bottom: 1.5rem;">
-        <a href="{{ url_for('inbox') }}" class="btn btn-secondary">← Back to Inbox</a>
+<div class="privacy-page">
+    <div class="privacy-page-header">
+        <h1>🛡️ Privacy & Consent Settings</h1>
+        <p>Control who can send you emails and manage your sender allowlists.</p>
     </div>
 
-    <h2 style="margin-bottom: 1.5rem;">Consent & Privacy Settings</h2>
-
-    <!-- Consent Mode Settings -->
-    <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 2rem;">
-        <h3 style="margin-top: 0;">Privacy Mode</h3>
-        <p style="color: #666; margin-bottom: 1rem;">
-            Control who can send you emails. Enable consent mode to require approval from external senders.
-        </p>
+    <!-- Privacy Mode -->
+    <div class="settings-card">
+        <div class="card-title">🔐 Privacy Mode</div>
 
         <form method="POST" action="{{ url_for('consent_settings') }}">
-            <div style="margin-bottom: 1rem;">
-                <label style="display: flex; align-items: center; cursor: pointer;">
-                    <input type="checkbox" name="require_consent" {% if require_consent %}checked{% endif %}
-                           style="margin-right: 10px; width: 18px; height: 18px;">
-                    <span style="font-weight: bold;">Require consent from external senders</span>
-                </label>
-                <p style="margin-left: 28px; color: #666; font-size: 0.9em;">
-                    External senders must request permission before their emails reach your inbox.
-                </p>
-            </div>
+            <label class="toggle-option">
+                <input type="checkbox" name="require_consent" {% if require_consent %}checked{% endif %}>
+                <div class="toggle-option-info">
+                    <h4>Require consent from external senders</h4>
+                    <p>External senders must request permission before their emails reach your inbox. Useful for reducing unsolicited email.</p>
+                </div>
+            </label>
 
-            <div style="margin-bottom: 1rem;">
-                <label style="display: flex; align-items: center; cursor: pointer;">
-                    <input type="checkbox" name="whitelist_mode" {% if whitelist_mode %}checked{% endif %}
-                           style="margin-right: 10px; width: 18px; height: 18px;">
-                    <span style="font-weight: bold;">Whitelist-only mode</span>
-                </label>
-                <p style="margin-left: 28px; color: #666; font-size: 0.9em;">
-                    Only accept emails from whitelisted senders. All others will be rejected.
-                </p>
-            </div>
+            <label class="toggle-option">
+                <input type="checkbox" name="whitelist_mode" {% if whitelist_mode %}checked{% endif %}>
+                <div class="toggle-option-info">
+                    <h4>Whitelist-only mode</h4>
+                    <p>Only accept emails from whitelisted senders. All others will be rejected outright.</p>
+                </div>
+            </label>
 
-            <div style="margin-bottom: 1rem; padding: 15px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px;">
-                <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 10px;">
-                    <input type="checkbox" name="require_payment" id="require_payment" {% if require_payment %}checked{% endif %}
-                           style="margin-right: 10px; width: 18px; height: 18px;" onchange="togglePaymentFields()">
-                    <span style="font-weight: bold;">💰 Pay-to-Send (Anti-Spam)</span>
-                </label>
-                <p style="margin-left: 28px; color: #666; font-size: 0.9em; margin-bottom: 10px;">
-                    Require external senders to pay a small cryptocurrency fee to send you emails.
-                    Whitelisted senders and internal users bypass this.
-                </p>
-                <div id="payment_fields" style="margin-left: 28px; {% if not require_payment %}display: none;{% endif %}">
-                    <div style="margin-bottom: 10px;">
-                        <label style="font-weight: bold; font-size: 0.9em; display: block; margin-bottom: 5px;">Payment Amount (USDC):</label>
-                        <input type="number" name="payment_amount" step="0.01" min="0" value="{{ payment_amount }}"
-                               placeholder="0.10" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 200px;">
-                        <span style="font-size: 0.85em; color: #666;">Recommended: $0.10 - $1.00</span>
-                    </div>
+            <!-- Pay-to-Send -->
+            <div class="payment-panel">
+                <div class="payment-panel-header">
+                    <input type="checkbox" name="require_payment" id="require_payment"
+                           {% if require_payment %}checked{% endif %}
+                           onchange="togglePaymentFields()">
                     <div>
-                        <label style="font-weight: bold; font-size: 0.9em; display: block; margin-bottom: 5px;">Your Wallet Address (to receive payments):</label>
+                        <h4>💰 Pay-to-Send (Anti-Spam Barrier)</h4>
+                        <p>Require external senders to pay a small cryptocurrency fee. Whitelisted senders and Privra users bypass this automatically.</p>
+                    </div>
+                </div>
+
+                <div id="payment_fields" class="payment-fields" style="{% if not require_payment %}display: none;{% endif %}">
+                    <div class="payment-field-row">
+                        <label>Payment Amount (USDC)</label>
+                        <input type="number" name="payment_amount" step="0.01" min="0"
+                               value="{{ payment_amount }}" placeholder="0.10"
+                               style="max-width: 200px;">
+                        <small>Recommended: $0.10 – $1.00</small>
+                    </div>
+                    <div class="payment-field-row">
+                        <label>Your Wallet Address (to receive payments)</label>
                         <input type="text" name="payment_address" value="{{ payment_address }}"
-                               placeholder="Your Solana or EVM wallet address"
-                               style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 100%; max-width: 500px;">
-                        <span style="font-size: 0.85em; color: #666;">Solana or Base/Ethereum address</span>
+                               placeholder="Your Solana or EVM wallet address">
+                        <small>Accepts Solana or Base/Ethereum addresses</small>
                     </div>
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-primary">Save Settings</button>
+            <button type="submit" class="btn-save">Save Privacy Settings</button>
         </form>
     </div>
 
-    <script>
-    function togglePaymentFields() {
-        const checkbox = document.getElementById('require_payment');
-        const fields = document.getElementById('payment_fields');
-        fields.style.display = checkbox.checked ? 'block' : 'none';
-    }
-    </script>
-
-    <!-- Whitelist Management -->
-    <div style="margin-bottom: 2rem;">
-        <h3>Whitelist</h3>
-        <p style="color: #666; margin-bottom: 1rem;">
-            Allow specific senders or domains. Use @domain.com to whitelist an entire domain.
+    <!-- Whitelist -->
+    <div class="settings-card">
+        <div class="card-title">✅ Whitelist — Allowed Senders</div>
+        <p style="color: var(--text-light); font-size: 0.875rem; margin: -0.5rem 0 1.25rem;">
+            Allow specific email addresses or entire domains. Use <code style="background: var(--bg-main); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.825rem; border: 1px solid var(--border);">@domain.com</code> to whitelist a whole domain.
         </p>
 
-        <!-- Add to Whitelist Form -->
-        <form method="POST" action="{{ url_for('add_whitelist') }}" style="display: flex; gap: 10px; margin-bottom: 1rem;">
-            <input type="text" name="sender" placeholder="email@example.com or @domain.com" required
-                   style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-            <input type="text" name="note" placeholder="Note (optional)"
-                   style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-            <button type="submit" class="btn btn-success">Add to Whitelist</button>
+        <form method="POST" action="{{ url_for('add_whitelist') }}" class="add-sender-row">
+            <input type="text" name="sender" placeholder="email@example.com or @domain.com" required>
+            <input type="text" name="note" placeholder="Note (optional)">
+            <button type="submit" class="btn-add-allow">+ Allow</button>
         </form>
 
-        <!-- Whitelist Table -->
         {% if whitelist %}
-        <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-                <tr style="background: #f8f9fa;">
-                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Sender</th>
-                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Note</th>
-                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Added</th>
-                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in whitelist %}
-                <tr style="border-bottom: 1px solid #dee2e6;">
-                    <td style="padding: 10px;">
-                        {% if item[1] %}
-                            {{ item[1] }}
-                        {% elif item[2] %}
-                            @{{ item[2] }}
-                        {% endif %}
-                    </td>
-                    <td style="padding: 10px; color: #666;">{{ item[3] or '-' }}</td>
-                    <td style="padding: 10px; color: #666; font-size: 0.9em;">{{ item[4].strftime('%Y-%m-%d') if item[4] else '-' }}</td>
-                    <td style="padding: 10px;">
-                        <form method="POST" action="{{ url_for('remove_whitelist', id=item[0]) }}" style="display: inline;">
-                            <button type="submit" class="btn btn-danger" style="padding: 4px 10px; font-size: 0.9em;">Remove</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div style="overflow-x: auto; border-radius: 10px; border: 1px solid var(--border);">
+            <table class="sender-table">
+                <thead>
+                    <tr>
+                        <th>Sender</th>
+                        <th>Note</th>
+                        <th>Added</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in whitelist %}
+                    <tr>
+                        <td>
+                            {% if item[1] %}{{ item[1] }}
+                            {% elif item[2] %}@{{ item[2] }}
+                            {% endif %}
+                        </td>
+                        <td class="td-light">{{ item[3] or '—' }}</td>
+                        <td class="td-light">{{ item[4].strftime('%Y-%m-%d') if item[4] else '—' }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('remove_whitelist', id=item[0]) }}" style="margin:0;">
+                                <button type="submit" class="btn-remove">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
-        <p style="text-align: center; color: #999; padding: 2rem; background: #f8f9fa; border-radius: 5px;">
-            No whitelisted senders yet. Add senders you trust above.
-        </p>
+        <div class="empty-table">No whitelisted senders yet. Add trusted senders above.</div>
         {% endif %}
     </div>
 
-    <!-- Blacklist Management -->
-    <div style="margin-bottom: 2rem;">
-        <h3>Blacklist</h3>
-        <p style="color: #666; margin-bottom: 1rem;">
-            Block specific senders or domains. Use @domain.com to block an entire domain.
+    <!-- Blacklist -->
+    <div class="settings-card">
+        <div class="card-title">🚫 Blacklist — Blocked Senders</div>
+        <p style="color: var(--text-light); font-size: 0.875rem; margin: -0.5rem 0 1.25rem;">
+            Block specific senders or entire domains permanently.
         </p>
 
-        <!-- Add to Blacklist Form -->
-        <form method="POST" action="{{ url_for('add_blacklist') }}" style="display: flex; gap: 10px; margin-bottom: 1rem;">
-            <input type="text" name="sender" placeholder="email@example.com or @domain.com" required
-                   style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-            <input type="text" name="reason" placeholder="Reason (optional)"
-                   style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-            <button type="submit" class="btn btn-danger">Add to Blacklist</button>
+        <form method="POST" action="{{ url_for('add_blacklist') }}" class="add-sender-row">
+            <input type="text" name="sender" placeholder="email@example.com or @domain.com" required>
+            <input type="text" name="reason" placeholder="Reason (optional)">
+            <button type="submit" class="btn-add-block">+ Block</button>
         </form>
 
-        <!-- Blacklist Table -->
         {% if blacklist %}
-        <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-                <tr style="background: #f8f9fa;">
-                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Sender</th>
-                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Reason</th>
-                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Added</th>
-                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in blacklist %}
-                <tr style="border-bottom: 1px solid #dee2e6;">
-                    <td style="padding: 10px;">
-                        {% if item[1] %}
-                            {{ item[1] }}
-                        {% elif item[2] %}
-                            @{{ item[2] }}
-                        {% endif %}
-                    </td>
-                    <td style="padding: 10px; color: #666;">{{ item[3] or '-' }}</td>
-                    <td style="padding: 10px; color: #666; font-size: 0.9em;">{{ item[4].strftime('%Y-%m-%d') if item[4] else '-' }}</td>
-                    <td style="padding: 10px;">
-                        <form method="POST" action="{{ url_for('remove_blacklist', id=item[0]) }}" style="display: inline;">
-                            <button type="submit" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.9em;">Remove</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div style="overflow-x: auto; border-radius: 10px; border: 1px solid var(--border);">
+            <table class="sender-table">
+                <thead>
+                    <tr>
+                        <th>Sender</th>
+                        <th>Reason</th>
+                        <th>Added</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in blacklist %}
+                    <tr>
+                        <td>
+                            {% if item[1] %}{{ item[1] }}
+                            {% elif item[2] %}@{{ item[2] }}
+                            {% endif %}
+                        </td>
+                        <td class="td-light">{{ item[3] or '—' }}</td>
+                        <td class="td-light">{{ item[4].strftime('%Y-%m-%d') if item[4] else '—' }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('remove_blacklist', id=item[0]) }}" style="margin:0;">
+                                <button type="submit" class="btn-remove">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
-        <p style="text-align: center; color: #999; padding: 2rem; background: #f8f9fa; border-radius: 5px;">
-            No blacklisted senders yet.
-        </p>
+        <div class="empty-table">No blocked senders yet.</div>
         {% endif %}
     </div>
 
-    <!-- Information Box -->
-    <div style="background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; padding: 15px; border-radius: 5px;">
-        <strong>How it works:</strong>
-        <ul style="margin: 10px 0 0 20px;">
-            <li>Privra users can always email each other (internal emails bypass consent)</li>
-            <li>Whitelist takes precedence over consent requirements</li>
-            <li>Blacklist blocks senders completely</li>
-            <li>Use @domain.com syntax to whitelist/blacklist entire domains</li>
-        </ul>
+    <!-- How it works -->
+    <div class="settings-card">
+        <div class="card-title">ℹ️ How Consent Controls Work</div>
+        <div class="info-box">
+            <h4>Rules &amp; Priority</h4>
+            <ul>
+                <li>Privra users can always email each other — internal mail bypasses consent checks</li>
+                <li>Whitelist takes precedence over consent requirements and pay-to-send</li>
+                <li>Blacklist blocks senders completely at the gateway level</li>
+                <li>Use <strong>@domain.com</strong> syntax to whitelist or blacklist entire domains at once</li>
+            </ul>
+        </div>
     </div>
 </div>
+
+<script>
+function togglePaymentFields() {
+    const checkbox = document.getElementById('require_payment');
+    const fields = document.getElementById('payment_fields');
+    fields.style.display = checkbox.checked ? 'grid' : 'none';
+}
+</script>
 {% endblock %}

@@ -51,16 +51,35 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #4facfe);
+            background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #4facfe, #a855f7);
             background-size: 400% 400%;
-            animation: gradientShift 15s ease infinite;
+            animation: gradientShift 12s ease infinite;
             z-index: -1;
-            opacity: 0.15;
+            opacity: 0.18;
+        }
+
+        /* Floating orbs for depth */
+        body::after {
+            content: '';
+            position: fixed;
+            top: -20%;
+            right: -10%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(118, 75, 162, 0.12) 0%, transparent 70%);
+            border-radius: 50%;
+            z-index: -1;
+            animation: orbFloat 20s ease-in-out infinite alternate;
         }
 
         @keyframes gradientShift {
             0%, 100% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
+        }
+
+        @keyframes orbFloat {
+            from { transform: translate(0, 0) scale(1); }
+            to   { transform: translate(-80px, 60px) scale(1.15); }
         }
 
         /* Flash Messages */

@@ -10,25 +10,23 @@
         height: calc(100vh - 200px);
     }
 
-    /* Folder Sidebar - Enhanced Glassmorphism */
+    /* Folder Sidebar */
     .folder-sidebar {
         width: 250px;
-        background: rgba(255, 255, 255, 0.15);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: var(--card-bg);
+        border: 1px solid var(--border);
         border-radius: 16px;
         padding: 1.5rem;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        box-shadow: var(--card-shadow);
         overflow-y: auto;
+        flex-shrink: 0;
     }
 
     .folder-sidebar h3 {
         font-size: 1.1rem;
         margin-bottom: 1rem;
-        color: white;
+        color: var(--text-dark);
         font-weight: 600;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
 
     .folder-list {
@@ -42,73 +40,84 @@
         align-items: center;
         gap: 0.75rem;
         padding: 0.75rem 1rem;
-        border-radius: 12px;
+        border-radius: 10px;
         cursor: pointer;
-        transition: all 0.3s ease;
-        margin-bottom: 0.5rem;
+        transition: all 0.2s ease;
+        margin-bottom: 0.25rem;
         text-decoration: none;
-        color: white;
-        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-light);
+        background: transparent;
+        border-left: 3px solid transparent;
     }
 
     .folder-item:hover {
-        background: rgba(255, 255, 255, 0.15);
-        transform: translateX(5px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        color: var(--primary);
+        background: rgba(118, 75, 162, 0.08);
+        border-left-color: var(--primary);
     }
 
     .folder-item.active {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
         color: white;
         font-weight: 600;
-        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+        box-shadow: 0 4px 12px rgba(118, 75, 162, 0.3);
+        border-left-color: transparent;
     }
 
     .folder-icon {
-        font-size: 1.2rem;
+        font-size: 1.1rem;
+        width: 20px;
+        text-align: center;
     }
 
     .folder-name {
         flex: 1;
+        font-size: 0.9rem;
+        font-weight: 500;
     }
 
     .folder-count {
-        background: rgba(255, 255, 255, 0.2);
+        background: rgba(118, 75, 162, 0.15);
+        color: var(--primary);
         padding: 0.15rem 0.5rem;
         border-radius: 10px;
         font-size: 0.75rem;
         font-weight: 600;
     }
 
+    .folder-item.active .folder-count {
+        background: rgba(255, 255, 255, 0.25);
+        color: white;
+    }
+
     .new-folder-btn {
         width: 100%;
         margin-top: 1rem;
         padding: 0.75rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
         color: white;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        border-radius: 12px;
+        border: none;
+        border-radius: 10px;
         cursor: pointer;
         font-weight: 600;
+        font-size: 0.9rem;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+        box-shadow: 0 4px 12px rgba(118, 75, 162, 0.25);
     }
 
     .new-folder-btn:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        box-shadow: 0 6px 18px rgba(118, 75, 162, 0.4);
     }
 
-    /* Email List Area - Enhanced Glassmorphism */
+    /* Email List Area */
     .email-area {
         flex: 1;
-        background: rgba(255, 255, 255, 0.15);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: var(--card-bg);
+        border: 1px solid var(--border);
         border-radius: 16px;
         padding: 1.5rem;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        box-shadow: var(--card-shadow);
         overflow-y: auto;
     }
 
@@ -117,30 +126,34 @@
         justify-content: space-between;
         align-items: center;
         margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border);
     }
 
     .email-header h2 {
-        font-size: 1.5rem;
-        color: white;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        font-size: 1.4rem;
+        color: var(--text-dark);
+        font-weight: 600;
     }
 
     .compose-btn {
-        padding: 0.75rem 1.5rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 0.65rem 1.25rem;
+        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
         color: white;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        border-radius: 12px;
+        border: none;
+        border-radius: 10px;
         text-decoration: none;
         font-weight: 600;
+        font-size: 0.9rem;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+        box-shadow: 0 4px 12px rgba(118, 75, 162, 0.25);
         display: inline-block;
+        cursor: pointer;
     }
 
     .compose-btn:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        box-shadow: 0 6px 18px rgba(118, 75, 162, 0.4);
     }
 
     .email-list {
@@ -151,24 +164,25 @@
 
     .email-item {
         padding: 1rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         display: flex;
         justify-content: space-between;
         align-items: center;
-        transition: all 0.3s ease;
-        border-radius: 12px;
+        transition: all 0.2s ease;
+        border-radius: 10px;
         margin-bottom: 0.5rem;
-        background: rgba(255, 255, 255, 0.05);
+        background: transparent;
+        border: 1px solid transparent;
+        cursor: pointer;
     }
 
     .email-item:hover {
-        background: rgba(255, 255, 255, 0.15);
-        transform: translateX(8px);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        background: rgba(118, 75, 162, 0.05);
+        border-color: var(--glass-border);
+        transform: translateX(4px);
     }
 
     .email-item a {
-        color: white;
+        color: var(--text-dark);
         text-decoration: none;
         flex: 1;
     }
@@ -176,17 +190,18 @@
     .email-subject {
         font-weight: 600;
         margin-bottom: 0.25rem;
-        color: white;
+        color: var(--text-dark);
+        font-size: 0.95rem;
     }
 
     .email-from {
-        color: rgba(255, 255, 255, 0.8);
-        font-size: 0.9rem;
+        color: var(--text-light);
+        font-size: 0.875rem;
     }
 
     .email-date {
-        color: rgba(255, 255, 255, 0.7);
-        font-size: 0.85rem;
+        color: var(--text-light);
+        font-size: 0.8rem;
         white-space: nowrap;
         margin-left: 1rem;
     }
@@ -229,21 +244,19 @@
         height: 36px;
         border-radius: 50%;
         object-fit: cover;
-        border: 2px solid rgba(255, 255, 255, 0.3);
+        border: 2px solid var(--border);
         flex-shrink: 0;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
 
     .sender-avatar-placeholder {
         width: 36px;
         height: 36px;
         border-radius: 50%;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
         display: flex;
         align-items: center;
         justify-content: center;
         color: white;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         font-weight: 600;
         font-size: 0.9rem;
         flex-shrink: 0;
@@ -256,8 +269,9 @@
 
     .no-emails {
         text-align: center;
-        color: var(--text-tertiary);
+        color: var(--text-light);
         padding: 3rem;
+        font-size: 1.05rem;
     }
 
     /* Mobile responsive */
