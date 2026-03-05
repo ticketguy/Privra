@@ -1,84 +1,289 @@
-{% extends "base.html" %}
+{% extends "base_auth.html" %}
 
 {% block title %}Recovery Key - Privra Webmail{% endblock %}
 
 {% block content %}
-<div class="card" style="max-width: 700px; margin: 2rem auto;">
-    <h2 style="text-align: center; margin-bottom: 1rem;">Your Recovery Key</h2>
-    <p style="text-align: center; color: #666; margin-bottom: 2rem;">
-        Account created for: <strong>{{ email }}</strong>
-    </p>
+<style>
+    .recovery-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1rem;
+        position: relative;
+        overflow: hidden;
+    }
 
-    <div style="background: #f8d7da; border: 2px solid #dc3545; color: #721c24; padding: 20px; border-radius: 8px; margin-bottom: 2rem;">
-        <h3 style="margin-top: 0; color: #721c24;">⚠️ IMPORTANT - Save This Key Immediately</h3>
-        <p><strong>This is your ONLY chance to see this recovery key.</strong></p>
-        <p>You will need this key to:</p>
-        <ul style="margin-left: 20px;">
-            <li>Decrypt your encrypted emails if you forget your password</li>
-            <li>Recover access to your encryption keys</li>
-            <li>Migrate your account to a new device</li>
-        </ul>
-        <p style="margin-bottom: 0;"><strong>We CANNOT recover this key if you lose it. Store it securely.</strong></p>
-    </div>
+    .recovery-container::before {
+        content: '';
+        position: absolute;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle at 20% 50%, rgba(118, 75, 162, 0.15) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 80%, rgba(102, 126, 234, 0.15) 0%, transparent 50%),
+                    radial-gradient(circle at 40% 20%, rgba(240, 147, 251, 0.1) 0%, transparent 50%);
+        animation: gradientShift 15s ease infinite;
+        z-index: 0;
+    }
 
-    <div style="background: #2c3e50; color: white; padding: 20px; border-radius: 8px; margin-bottom: 2rem;">
-        <label style="display: block; margin-bottom: 10px; font-weight: bold; font-size: 1.1em;">Your Recovery Key:</label>
-        <div style="background: #34495e; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 1em; word-break: break-all; user-select: all;">
-            {{ recovery_key }}
+    @keyframes gradientShift {
+        0%, 100% { transform: translate(0, 0) rotate(0deg); }
+        33% { transform: translate(-5%, -5%) rotate(60deg); }
+        66% { transform: translate(5%, 5%) rotate(-60deg); }
+    }
+
+    .recovery-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 24px;
+        box-shadow: 0 8px 32px rgba(118, 75, 162, 0.2),
+                    inset 0 1px 1px rgba(255, 255, 255, 0.1);
+        max-width: 640px;
+        width: 100%;
+        padding: 3rem 2.5rem;
+        border: 1px solid var(--glass-border);
+        position: relative;
+        z-index: 1;
+    }
+
+    .recovery-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .recovery-logo {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .recovery-title {
+        font-size: 1.75rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 0.5rem;
+    }
+
+    .recovery-subtitle {
+        color: var(--text-light);
+        font-size: 0.95rem;
+    }
+
+    .alert-danger {
+        background: rgba(220, 53, 69, 0.12);
+        border: 1px solid rgba(220, 53, 69, 0.4);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        color: var(--text-dark);
+    }
+
+    .alert-danger h3 {
+        color: #dc3545;
+        margin-bottom: 0.5rem;
+        font-size: 1rem;
+    }
+
+    .alert-danger ul {
+        margin: 0.5rem 0 0 1.25rem;
+        font-size: 0.9rem;
+    }
+
+    .key-box {
+        background: #1a1a2e;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .key-box label {
+        display: block;
+        color: #a0aec0;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    .key-value {
+        background: #0d0d1a;
+        border-radius: 8px;
+        padding: 1rem;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 0.9rem;
+        word-break: break-all;
+        user-select: all;
+        color: #68d391;
+        letter-spacing: 0.03em;
+        margin-bottom: 1rem;
+    }
+
+    .copy-btn {
+        width: 100%;
+        padding: 0.75rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .copy-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(118, 75, 162, 0.3);
+    }
+
+    .alert-info {
+        background: rgba(79, 172, 254, 0.1);
+        border: 1px solid rgba(79, 172, 254, 0.3);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        color: var(--text-dark);
+        font-size: 0.9rem;
+    }
+
+    .alert-info strong {
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .alert-info ol {
+        margin: 0.5rem 0 0 1.25rem;
+    }
+
+    .confirm-section {
+        background: rgba(255, 193, 7, 0.1);
+        border: 1px solid rgba(255, 193, 7, 0.3);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .confirm-label {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        cursor: pointer;
+        color: var(--text-dark);
+        font-size: 0.9rem;
+    }
+
+    .confirm-label input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        margin-top: 2px;
+        flex-shrink: 0;
+        cursor: pointer;
+        accent-color: var(--primary);
+    }
+
+    .continue-btn {
+        width: 100%;
+        padding: 0.95rem;
+        font-size: 1rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #27ae60, #2ecc71);
+        color: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .continue-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(39, 174, 96, 0.3);
+    }
+
+    .continue-btn:disabled {
+        background: #95a5a6;
+        cursor: not-allowed;
+        opacity: 0.6;
+        transform: none;
+    }
+</style>
+
+<div class="recovery-container">
+    <div class="recovery-card">
+        <div class="recovery-header">
+            <div class="recovery-logo">🔑</div>
+            <h1 class="recovery-title">Your Recovery Key</h1>
+            <p class="recovery-subtitle">Account created for: <strong>{{ email }}</strong></p>
         </div>
-        <button onclick="copyRecoveryKey()" class="btn btn-primary" style="margin-top: 15px; width: 100%;">
-            📋 Copy to Clipboard
-        </button>
-    </div>
 
-    <div style="background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; padding: 15px; border-radius: 5px; margin-bottom: 2rem;">
-        <strong>How to store your recovery key safely:</strong>
-        <ol style="margin: 10px 0 0 20px;">
-            <li>Write it down on paper and store it in a safe place</li>
-            <li>Save it to a password manager (1Password, Bitwarden, etc.)</li>
-            <li>Store it in an encrypted file on secure storage</li>
-            <li><strong>DO NOT</strong> store it in plain text files or emails</li>
-        </ol>
-    </div>
-
-    <form method="POST" action="{{ url_for('confirm_recovery_key') }}">
-        <div style="background: #fff3cd; border: 1px solid #ffeeba; padding: 15px; border-radius: 5px; margin-bottom: 1.5rem;">
-            <label style="display: flex; align-items: center; cursor: pointer;">
-                <input type="checkbox" id="confirm" required style="margin-right: 10px; width: 18px; height: 18px;">
-                <span>I have securely saved my recovery key and understand I cannot recover it later</span>
-            </label>
+        <div class="alert-danger">
+            <h3>⚠️ IMPORTANT — Save This Key Immediately</h3>
+            <p><strong>This is your ONLY chance to see this recovery key.</strong> You will need it to:</p>
+            <ul>
+                <li>Decrypt your encrypted emails if you forget your password</li>
+                <li>Recover access to your encryption keys</li>
+                <li>Migrate your account to a new device</li>
+            </ul>
+            <p style="margin-bottom: 0; margin-top: 0.75rem;"><strong>We CANNOT recover this key if you lose it.</strong></p>
         </div>
 
-        <button type="submit" class="btn btn-success" style="width: 100%;" id="continueBtn" disabled>
-            Continue to Login →
-        </button>
-    </form>
+        <div class="key-box">
+            <label>Your Recovery Key</label>
+            <div class="key-value" id="recoveryKeyDisplay">{{ recovery_key }}</div>
+            <button onclick="copyRecoveryKey()" class="copy-btn" id="copyBtn">
+                📋 Copy to Clipboard
+            </button>
+        </div>
+
+        <div class="alert-info">
+            <strong>How to store your recovery key safely:</strong>
+            <ol>
+                <li>Write it down on paper and keep it in a secure location</li>
+                <li>Save it to a password manager (1Password, Bitwarden, etc.)</li>
+                <li>Store it in an encrypted file on secure offline storage</li>
+                <li><strong>Do NOT</strong> store it in plain text files or email</li>
+            </ol>
+        </div>
+
+        <form method="POST" action="{{ url_for('confirm_recovery_key') }}">
+            <div class="confirm-section">
+                <label class="confirm-label">
+                    <input type="checkbox" id="confirm" required onchange="toggleContinue(this)">
+                    <span>I have securely saved my recovery key and understand that Privra cannot recover it for me.</span>
+                </label>
+            </div>
+
+            <button type="submit" class="continue-btn" id="continueBtn" disabled>
+                Continue to Login →
+            </button>
+        </form>
+    </div>
 </div>
 
 <script>
 function copyRecoveryKey() {
-    const key = "{{ recovery_key }}";
+    const key = {{ recovery_key | tojson }};
     navigator.clipboard.writeText(key).then(() => {
-        alert('Recovery key copied to clipboard!');
-    }).catch(err => {
-        console.error('Failed to copy:', err);
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => { btn.textContent = '📋 Copy to Clipboard'; }, 2000);
+    }).catch(() => {
+        // Fallback for older browsers
+        const el = document.getElementById('recoveryKeyDisplay');
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+        document.execCommand('copy');
+        alert('Recovery key copied!');
     });
 }
 
-document.getElementById('confirm').addEventListener('change', function() {
-    document.getElementById('continueBtn').disabled = !this.checked;
-});
+function toggleContinue(checkbox) {
+    document.getElementById('continueBtn').disabled = !checkbox.checked;
+}
 </script>
-
-<style>
-.btn-success {
-    background: #27ae60;
-    color: white;
-}
-.btn-success:disabled {
-    background: #95a5a6;
-    cursor: not-allowed;
-    opacity: 0.6;
-}
-</style>
 {% endblock %}
